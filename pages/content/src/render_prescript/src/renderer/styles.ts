@@ -230,10 +230,10 @@ export const styles = `
     overflow: hidden;
     width: 100%;
     box-sizing: border-box;
-    transition: max-height 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
-                opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                padding 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                border-color 0.4s ease-out;
+    transition: max-height 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
+                opacity 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                padding 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                border-color 0.3s ease-out;
     will-change: max-height, opacity, padding;
     border: 1px solid transparent;
     border-top: none;
@@ -244,6 +244,24 @@ export const styles = `
     max-height: 0;
     opacity: 0;
     padding: 0 12px;
+  }
+  
+  /* Enhanced auto-expanded state for streaming content */
+  .function-block.auto-expanded .expandable-content {
+    animation: smoothExpand 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  
+  @keyframes smoothExpand {
+    from {
+      max-height: 0;
+      opacity: 0;
+      padding: 0 12px;
+    }
+    to {
+      max-height: 2000px;
+      opacity: 1;
+      padding: 12px;
+    }
   }
   
   .function-block:not(.expanded) .expandable-content {
@@ -374,7 +392,10 @@ export const styles = `
     border-radius: var(--border-radius);
     font-family: var(--font-mono);
     white-space: pre-wrap;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    word-break: break-word;
+    overflow-wrap: break-word;
     font-size: 13px;
     line-height: 1.5;
     max-height: 300px;
@@ -467,15 +488,83 @@ export const styles = `
   /* Optimized streaming parameter styles with hardware acceleration */
   .param-value[data-streaming="true"] {
     padding: 0;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     max-height: 300px;
     border-color: rgba(26, 115, 232, 0.3);
     animation: subtle-pulse 2s infinite ease-in-out;
-    will-change: border-color;
+    will-change: border-color, transform;
     transform: translate3d(0,0,0);
     scroll-behavior: smooth !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+  
+  /* Fade gradient overlays for smooth streaming effect */
+  .param-value[data-streaming="true"]::before,
+  .param-value[data-streaming="true"]::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 20px;
+    pointer-events: none;
+    z-index: 2;
+    transition: opacity 0.3s ease;
+  }
+  
+  .param-value[data-streaming="true"]::before {
+    top: 0;
+    background: linear-gradient(to bottom, 
+      rgba(255, 255, 255, 0.9) 0%, 
+      rgba(255, 255, 255, 0.7) 50%, 
+      transparent 100%);
+  }
+  
+  .param-value[data-streaming="true"]::after {
+    bottom: 0;
+    background: linear-gradient(to top, 
+      rgba(255, 255, 255, 0.9) 0%, 
+      rgba(255, 255, 255, 0.7) 50%, 
+      transparent 100%);
+  }
+  
+  /* Dark theme fade gradients */
+  .function-block.theme-dark .param-value[data-streaming="true"]::before {
+    background: linear-gradient(to bottom, 
+      rgba(32, 33, 36, 0.9) 0%, 
+      rgba(32, 33, 36, 0.7) 50%, 
+      transparent 100%);
+  }
+  
+  .function-block.theme-dark .param-value[data-streaming="true"]::after {
+    background: linear-gradient(to top, 
+      rgba(32, 33, 36, 0.9) 0%, 
+      rgba(32, 33, 36, 0.7) 50%, 
+      transparent 100%);
+  }
+  
+  /* Enhanced streaming visual feedback */
+  .param-value[data-streaming="true"]::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      rgba(26, 115, 232, 0.6) 50%, 
+      transparent 100%);
+    animation: streamingIndicator 2s infinite linear;
+    z-index: 1;
+  }
+  
+  @keyframes streamingIndicator {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
   }
   
   /* Enhanced streaming content structure */
@@ -491,13 +580,16 @@ export const styles = `
   .param-value[data-streaming="true"] .content-wrapper > pre {
     margin: 0;
     padding: var(--spacing-md) 14px;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
     max-height: 300px;
     flex: 1;
     font-family: var(--font-mono);
     font-size: 13px;
     line-height: 1.5;
     white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: break-word;
     background-color: inherit;
     color: inherit !important;
     border: none;
@@ -506,6 +598,12 @@ export const styles = `
     transform: translate3d(0,0,0);
     width: 100%;
     min-height: inherit;
+    animation: textFlow 0.3s ease-out;
+  }
+  
+  @keyframes textFlow {
+    from { opacity: 0.7; transform: translateY(2px); }
+    to { opacity: 1; transform: translateY(0); }
   }
   
   /* Enhanced scrollbar for streaming content */
@@ -632,8 +730,67 @@ export const styles = `
     background-color: rgba(255, 200, 0, 0.3);
   }
   
+  /* Virtual scrolling container optimizations */
+  .virtual-viewport {
+    contain: layout style paint;
+    will-change: scroll-position;
+    transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .virtual-spacer {
+    contain: layout style;
+    will-change: height, transform;
+  }
+  
+  .param-value[data-streaming="true"] .virtual-viewport {
+    scroll-behavior: auto !important;
+  }
+  
+  .param-value[data-streaming="true"] .virtual-viewport pre {
+    will-change: transform, contents;
+    contain: layout style paint;
+  }
+  
+  /* Enhanced function block states */
+  .function-block.function-loading {
+    background: linear-gradient(135deg, 
+      rgba(26, 115, 232, 0.02) 0%, 
+      rgba(26, 115, 232, 0.01) 100%);
+    border-left: 3px solid rgba(26, 115, 232, 0.3);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .function-block.function-complete {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .function-block.auto-expanded {
+    box-shadow: 0 4px 16px rgba(26, 115, 232, 0.15);
+    border-color: rgba(26, 115, 232, 0.2);
+  }
+  
+  .function-block.theme-dark.auto-expanded {
+    box-shadow: 0 4px 16px rgba(138, 180, 248, 0.15);
+    border-color: rgba(138, 180, 248, 0.2);
+  }
+  
   /* Optimized keyframe animations */
   @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+  
+  @keyframes subtle-pulse {
+    0%, 100% { border-color: rgba(26, 115, 232, 0.2); }
+    50% { border-color: rgba(26, 115, 232, 0.4); }
+  }
     from { opacity: 0; transform: translateY(-4px); }
     to { opacity: 1; transform: translateY(0); }
   }

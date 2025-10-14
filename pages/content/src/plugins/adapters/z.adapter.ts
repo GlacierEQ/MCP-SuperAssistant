@@ -2,18 +2,18 @@ import { BaseAdapterPlugin } from './base.adapter';
 import type { AdapterCapability, PluginContext } from '../plugin-types';
 
 /**
- * Perplexity Adapter for Perplexity AI (perplexity.ai)
+ * Z Adapter for Z AI (z.ai)
  *
- * This adapter provides specialized functionality for interacting with Perplexity AI's
+ * This adapter provides specialized functionality for interacting with Z AI's
  * chat interface, including text insertion, form submission, and file attachment capabilities.
  *
  * Migrated from the legacy adapter system to the new plugin architecture.
  * Maintains compatibility with existing functionality while integrating with Zustand stores.
  */
-export class PerplexityAdapter extends BaseAdapterPlugin {
-  readonly name = 'PerplexityAdapter';
-  readonly version = '2.0.0'; // Incremented for new architecture
-  readonly hostnames = ['perplexity.ai', 'www.perplexity.ai'];
+export class ZAdapter extends BaseAdapterPlugin {
+  readonly name = 'ZAdapter';
+  readonly version = '1.0.0'; // Incremented for new architecture
+  readonly hostnames = ['z.ai', 'chat.z.ai'];
   readonly capabilities: AdapterCapability[] = [
     'text-insertion',
     'form-submission',
@@ -21,26 +21,29 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     'dom-manipulation'
   ];
 
-  // CSS selectors for Perplexity's UI elements
-  // Updated selectors based on current Perplexity interface
+  // CSS selectors for Z's UI elements
+  // Updated selectors based on current Z interface
   private readonly selectors = {
     // Primary chat input selectors
-    CHAT_INPUT: '#ask-input[contenteditable="true"], #ask-input[role="textbox"], div[role="textbox"][contenteditable="true"], textarea[placeholder="Ask anything..."], textarea[placeholder="Ask follow-up"], textarea[placeholder*="Ask"], div[contenteditable="true"][data-lexical-editor="true"]',
+    CHAT_INPUT: '#chat-input',
     // Submit button selectors (multiple fallbacks)
-    SUBMIT_BUTTON: 'button[aria-label="Submit"], button[aria-label="Send"], button[type="submit"]',
+    SUBMIT_BUTTON: '#send-message-button, #send-message-button[type="submit"]',
     // File upload related selectors
-    FILE_UPLOAD_BUTTON: 'button[aria-label*="Attach"], button[aria-label*="attach"]',
-    FILE_INPUT: 'input[type="file"][multiple][accept*=".pdf"], input[type="file"][multiple]',
+    FILE_UPLOAD_BUTTON: 'button[aria-label*="More"], button[aria-label*="more"]',
+    FILE_INPUT:
+      'input[type="file"][multiple][accept*=".pdf,.docx,.doc,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.csv,.py,.txt,.md,.bmp,.gif"], input[type="file"][multiple]',
     // Main panel and container selectors
-    MAIN_PANEL: '.main-content, .chat-container, .conversation-container',
+    MAIN_PANEL: 'form.w-full.flex.gap-1\.5',
     // Drop zones for file attachment
-    DROP_ZONE: 'textarea[placeholder*="Ask"], .input-area, .chat-input-container',
+    DROP_ZONE: 'input[type="file"][multiple][hidden]',
     // File preview elements
-    FILE_PREVIEW: '.file-preview, .attachment-preview, .file-upload-preview',
+    FILE_PREVIEW:
+      'div.flex.relative.w-full.h-full > div > div.px-3.pb-3 > div.w-full.font-primary > div.transparent > div > div > form > div > div:nth-of-type(1)',
     // Button insertion points (for MCP popover) - looking for search/research toggle area
-    BUTTON_INSERTION_CONTAINER: 'div[role="radiogroup"].group.relative.isolate.flex, .flex.items-center, div.flex.items-end.gap-sm',
+    BUTTON_INSERTION_CONTAINER:
+      'button[aria-label="More"], button[type="submit"]',
     // Alternative insertion points
-    FALLBACK_INSERTION: '.input-area, .chat-input-container, .conversation-input'
+    FALLBACK_INSERTION: '#chat-input',
   };
 
   // URL patterns for navigation tracking
@@ -51,35 +54,37 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
   private mcpPopoverContainer: HTMLElement | null = null;
   private mutationObserver: MutationObserver | null = null;
   private popoverCheckInterval: NodeJS.Timeout | null = null;
-  
+
   // Setup state tracking
   private storeEventListenersSetup: boolean = false;
   private domObserversSetup: boolean = false;
   private uiIntegrationSetup: boolean = false;
-  
+
   // Instance tracking for debugging
   private static instanceCount = 0;
   private instanceId: number;
-  
+
   // Style injection tracking
   private adapterStylesInjected: boolean = false;
 
   constructor() {
     super();
-    PerplexityAdapter.instanceCount++;
-    this.instanceId = PerplexityAdapter.instanceCount;
-    console.debug(`[PerplexityAdapter] Instance #${this.instanceId} created. Total instances: ${PerplexityAdapter.instanceCount}`);
+    ZAdapter.instanceCount++;
+    this.instanceId = ZAdapter.instanceCount;
+    console.debug(`[ZAdapter] Instance #${this.instanceId} created. Total instances: ${ZAdapter.instanceCount}`);
   }
 
   async initialize(context: PluginContext): Promise<void> {
     // Guard against multiple initialization
     if (this.currentStatus === 'initializing' || this.currentStatus === 'active') {
-      this.context?.logger.warn(`Perplexity adapter instance #${this.instanceId} already initialized or active, skipping re-initialization`);
+      this.context?.logger.warn(
+        `Z adapter instance #${this.instanceId} already initialized or active, skipping re-initialization`,
+      );
       return;
     }
 
     await super.initialize(context);
-    this.context.logger.debug(`Initializing Perplexity adapter instance #${this.instanceId}...`);
+    this.context.logger.debug(`Initializing Z adapter instance #${this.instanceId}...`);
 
     // Initialize URL tracking
     this.lastUrl = window.location.href;
@@ -92,15 +97,15 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
   async activate(): Promise<void> {
     // Guard against multiple activation
     if (this.currentStatus === 'active') {
-      this.context?.logger.warn(`Perplexity adapter instance #${this.instanceId} already active, skipping re-activation`);
+      this.context?.logger.warn(`Z adapter instance #${this.instanceId} already active, skipping re-activation`);
       return;
     }
 
     await super.activate();
-    this.context.logger.debug(`Activating Perplexity adapter instance #${this.instanceId}...`);
+    this.context.logger.debug(`Activating Z adapter instance #${this.instanceId}...`);
 
-    // Inject Perplexity-specific button styles
-    this.injectPerplexityButtonStyles();
+    // Inject Z-specific button styles
+    this.injectZButtonStyles();
 
     // Set up DOM observers and UI integration
     this.setupDOMObservers();
@@ -116,12 +121,12 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
   async deactivate(): Promise<void> {
     // Guard against double deactivation
     if (this.currentStatus === 'inactive' || this.currentStatus === 'disabled') {
-      this.context?.logger.warn('Perplexity adapter already inactive, skipping deactivation');
+      this.context?.logger.warn('Z adapter already inactive, skipping deactivation');
       return;
     }
 
     await super.deactivate();
-    this.context.logger.debug('Deactivating Perplexity adapter...');
+    this.context.logger.debug('Deactivating Z adapter...');
 
     // Clean up UI integration
     this.cleanupUIIntegration();
@@ -141,7 +146,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
 
   async cleanup(): Promise<void> {
     await super.cleanup();
-    this.context.logger.debug('Cleaning up Perplexity adapter...');
+    this.context.logger.debug('Cleaning up Z adapter...');
 
     // Clear URL tracking interval
     if (this.urlCheckInterval) {
@@ -156,7 +161,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     }
 
     // Remove injected adapter styles
-    const styleElement = document.getElementById('mcp-perplexity-button-styles');
+    const styleElement = document.getElementById('mcp-z-button-styles');
     if (styleElement) {
       styleElement.remove();
       this.adapterStylesInjected = false;
@@ -165,7 +170,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     // Final cleanup
     this.cleanupUIIntegration();
     this.cleanupDOMObservers();
-    
+
     // Reset all setup flags
     this.storeEventListenersSetup = false;
     this.domObserversSetup = false;
@@ -173,11 +178,13 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
   }
 
   /**
-   * Insert text into the Perplexity chat input field
+   * Insert text into the Z chat input field
    * Enhanced with better selector handling, event integration, and URL-specific methods
    */
   async insertText(text: string, options?: { targetElement?: HTMLElement }): Promise<boolean> {
-    this.context.logger.debug(`Attempting to insert text into Perplexity chat input: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`);
+    this.context.logger.debug(
+      `Attempting to insert text into Z chat input: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`,
+    );
 
     let targetElement: HTMLElement | null = null;
 
@@ -196,7 +203,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     }
 
     if (!targetElement) {
-      this.context.logger.error('Could not find Perplexity chat input element');
+      this.context.logger.error('Could not find Z chat input element');
       this.emitExecutionFailed('insertText', 'Chat input element not found');
       return false;
     }
@@ -204,7 +211,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     try {
       // Check if we're on the homepage and use the special method
       const currentUrl = window.location.href;
-      if (currentUrl === 'https://www.perplexity.ai/' || currentUrl === 'https://perplexity.ai/' || true) {
+      if (currentUrl === 'https://chat.z.ai/' || currentUrl === 'https://z.ai/' || true) {
         // this.context.logger.debug('Homepage detected, using InputEvent method for text insertion');
         this.context.logger.debug('Using InputEvent method for text insertion for all pages');
         return await this.insertTextViaInputEvent(targetElement, text);
@@ -220,7 +227,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
       // // Insert the text by updating the value and dispatching appropriate events
       // // Append the text to the original value on a new line if there's existing content
       // const newContent = originalValue ? originalValue + '\n\n' + text : text;
-      
+
       // if (isContentEditable) {
       //   (targetElement as HTMLElement).textContent = newContent;
       // } else {
@@ -244,7 +251,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
       // return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.context.logger.error(`Error inserting text into Perplexity chat input: ${errorMessage}`);
+      this.context.logger.error(`Error inserting text into Z chat input: ${errorMessage}`);
       this.emitExecutionFailed('insertText', errorMessage);
       return false;
     }
@@ -256,7 +263,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
   private async insertTextViaInputEvent(element: HTMLElement, text: string): Promise<boolean> {
     try {
       const originalValue = this.getElementContent(element);
-      
+
       // Focus the element
       element.focus();
 
@@ -273,26 +280,34 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
       const textToEnter = originalValue ? originalValue + '\n\n' + text : text;
 
       // Use InputEvent instead of execCommand
-      element.dispatchEvent(new InputEvent('input', {
+      element.value = textToEnter;
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+
+      /*element.dispatchEvent(new InputEvent('input', {
         inputType: 'insertText',
         data: textToEnter,
         bubbles: true,
         cancelable: true
-      }));
+      }));*/
 
       // Also dispatch change event for compatibility
       element.dispatchEvent(new Event('change', { bubbles: true }));
 
       // Emit success event
-      this.emitExecutionCompleted('insertText', { text }, {
-        success: true,
-        originalLength: originalValue.length,
-        newLength: text.length,
-        totalLength: textToEnter.length,
-        method: 'InputEvent-homepage'
-      });
+      this.emitExecutionCompleted(
+        'insertText',
+        { text },
+        {
+          success: true,
+          originalLength: originalValue.length,
+          newLength: text.length,
+          totalLength: textToEnter.length,
+        },
+      );
 
-      this.context.logger.debug(`Text inserted successfully via InputEvent on homepage. Original: ${originalValue.length}, Added: ${text.length}, Total: ${textToEnter.length}`);
+      this.context.logger.debug(
+        `Text inserted successfully. Original: ${originalValue.length}, Added: ${text.length}, Total: ${textToEnter.length}`,
+      );
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -306,9 +321,11 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
    * Check if an element is contenteditable
    */
   private isContentEditableElement(element: HTMLElement): boolean {
-    return element.isContentEditable || 
-           element.getAttribute('contenteditable') === 'true' ||
-           element.hasAttribute('contenteditable');
+    return (
+      element.isContentEditable ||
+      element.getAttribute('contenteditable') === 'true' ||
+      element.hasAttribute('contenteditable')
+    );
   }
 
   /**
@@ -323,16 +340,16 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
   }
 
   /**
-   * Submit the current text in the Perplexity chat input
+   * Submit the current text in the Z chat input
    * Enhanced with multiple selector fallbacks and better error handling
    */
   async submitForm(options?: { formElement?: HTMLFormElement }): Promise<boolean> {
-    this.context.logger.debug('Attempting to submit Perplexity chat input');
+    this.context.logger.debug('Attempting to submit Z chat input');
 
     // First try to find submit button
     let submitButton: HTMLButtonElement | null = null;
     const selectors = this.selectors.SUBMIT_BUTTON.split(', ');
-    
+
     for (const selector of selectors) {
       submitButton = document.querySelector(selector.trim()) as HTMLButtonElement;
       if (submitButton) {
@@ -355,38 +372,41 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     if (submitButton) {
       try {
         // Check if the button is disabled
-        const isDisabled = submitButton.disabled || 
-                          submitButton.getAttribute('disabled') !== null ||
-                          submitButton.getAttribute('aria-disabled') === 'true' ||
-                          submitButton.classList.contains('disabled');
+        const isDisabled =
+          submitButton.disabled ||
+          submitButton.getAttribute('disabled') !== null ||
+          submitButton.getAttribute('aria-disabled') === 'true' ||
+          submitButton.classList.contains('disabled');
 
         if (isDisabled) {
-          this.context.logger.warn('Perplexity submit button is disabled, waiting for it to be enabled');
-          
+          this.context.logger.warn('Z submit button is disabled, waiting for it to be enabled');
+
           // Wait for button to be enabled (with timeout)
           const maxWaitTime = 5000; // 5 seconds
           const startTime = Date.now();
-          
+
           while (Date.now() - startTime < maxWaitTime) {
             await new Promise(resolve => setTimeout(resolve, 300));
-            
+
             // Re-check if button is now enabled
-            const stillDisabled = submitButton!.disabled || 
-                                 submitButton!.getAttribute('disabled') !== null ||
-                                 submitButton!.getAttribute('aria-disabled') === 'true' ||
-                                 submitButton!.classList.contains('disabled');
-            
+            const stillDisabled =
+              submitButton!.disabled ||
+              submitButton!.getAttribute('disabled') !== null ||
+              submitButton!.getAttribute('aria-disabled') === 'true' ||
+              submitButton!.classList.contains('disabled');
+
             if (!stillDisabled) {
               break;
             }
           }
-          
+
           // Final check
-          const finallyDisabled = submitButton.disabled || 
-                                 submitButton.getAttribute('disabled') !== null ||
-                                 submitButton.getAttribute('aria-disabled') === 'true' ||
-                                 submitButton.classList.contains('disabled');
-          
+          const finallyDisabled =
+            submitButton.disabled ||
+            submitButton.getAttribute('disabled') !== null ||
+            submitButton.getAttribute('aria-disabled') === 'true' ||
+            submitButton.classList.contains('disabled');
+
           if (finallyDisabled) {
             this.context.logger.warn('Submit button remained disabled, falling back to Enter key');
             return this.submitWithEnterKey();
@@ -396,7 +416,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
         // Check if the button is visible and clickable
         const rect = submitButton.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) {
-          this.context.logger.warn('Perplexity submit button is not visible, falling back to Enter key');
+          this.context.logger.warn('Z submit button is not visible, falling back to Enter key');
           return this.submitWithEnterKey();
         }
 
@@ -404,15 +424,19 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
         submitButton.click();
 
         // Emit success event to the new event system
-        this.emitExecutionCompleted('submitForm', {
-          formElement: options?.formElement?.tagName || 'unknown'
-        }, {
-          success: true,
-          method: 'submitButton.click',
-          buttonSelector: selectors.find(s => document.querySelector(s.trim()) === submitButton)
-        });
+        this.emitExecutionCompleted(
+          'submitForm',
+          {
+            formElement: options?.formElement?.tagName || 'unknown',
+          },
+          {
+            success: true,
+            method: 'submitButton.click',
+            buttonSelector: selectors.find(s => document.querySelector(s.trim()) === submitButton),
+          },
+        );
 
-        this.context.logger.debug('Perplexity chat input submitted successfully via button click');
+        this.context.logger.debug('Z chat input submitted successfully via button click');
         return true;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -420,7 +444,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
         return this.submitWithEnterKey();
       }
     } else {
-      this.context.logger.warn('Could not find Perplexity submit button, falling back to Enter key');
+      this.context.logger.warn('Could not find Z submit button, falling back to Enter key');
       return this.submitWithEnterKey();
     }
   }
@@ -442,14 +466,16 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
       // Simulate Enter key press
       const enterEvents = ['keydown', 'keypress', 'keyup'];
       for (const eventType of enterEvents) {
-        chatInput.dispatchEvent(new KeyboardEvent(eventType, {
-          key: 'Enter',
-          code: 'Enter',
-          keyCode: 13,
-          which: 13,
-          bubbles: true,
-          cancelable: true
-        }));
+        chatInput.dispatchEvent(
+          new KeyboardEvent(eventType, {
+            key: 'Enter',
+            code: 'Enter',
+            keyCode: 13,
+            which: 13,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
       }
 
       // Try form submission as additional fallback
@@ -459,12 +485,16 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
         form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
       }
 
-      this.emitExecutionCompleted('submitForm', {}, {
-        success: true,
-        method: 'enterKey+formSubmit'
-      });
+      this.emitExecutionCompleted(
+        'submitForm',
+        {},
+        {
+          success: true,
+          method: 'enterKey+formSubmit',
+        },
+      );
 
-      this.context.logger.debug('Perplexity chat input submitted successfully via Enter key');
+      this.context.logger.debug('Z chat input submitted successfully via Enter key');
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -475,7 +505,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
   }
 
   /**
-   * Attach a file to the Perplexity chat input
+   * Attach a file to the Z chat input
    * Enhanced with better error handling and integration with new architecture
    */
   async attachFile(file: File, options?: { inputElement?: HTMLInputElement }): Promise<boolean> {
@@ -497,14 +527,18 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
       // Method 1: Try using hidden file input element
       const success1 = await this.attachFileViaInput(file);
       if (success1) {
-        this.emitExecutionCompleted('attachFile', {
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size
-        }, {
-          success: true,
-          method: 'file-input'
-        });
+        this.emitExecutionCompleted(
+          'attachFile',
+          {
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+          },
+          {
+            success: true,
+            method: 'file-input',
+          },
+        );
         this.context.logger.debug(`File attached successfully via input: ${file.name}`);
         return true;
       }
@@ -512,28 +546,36 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
       // Method 2: Fallback to drag and drop simulation
       const success2 = await this.attachFileViaDragDrop(file);
       if (success2) {
-        this.emitExecutionCompleted('attachFile', {
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size
-        }, {
-          success: true,
-          method: 'drag-drop'
-        });
+        this.emitExecutionCompleted(
+          'attachFile',
+          {
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+          },
+          {
+            success: true,
+            method: 'drag-drop',
+          },
+        );
         this.context.logger.debug(`File attached successfully via drag-drop: ${file.name}`);
         return true;
       }
 
       // Method 3: Try clipboard as final fallback
       const success3 = await this.attachFileViaClipboard(file);
-      this.emitExecutionCompleted('attachFile', {
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size
-      }, {
-        success: success3,
-        method: 'clipboard'
-      });
+      this.emitExecutionCompleted(
+        'attachFile',
+        {
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+        },
+        {
+          success: success3,
+          method: 'clipboard',
+        },
+      );
 
       if (success3) {
         this.context.logger.debug(`File copied to clipboard for manual paste: ${file.name}`);
@@ -544,7 +586,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
       return success3;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.context.logger.error(`Error attaching file to Perplexity: ${errorMessage}`);
+      this.context.logger.error(`Error attaching file to Z: ${errorMessage}`);
       this.emitExecutionFailed('attachFile', errorMessage);
       return false;
     }
@@ -663,10 +705,10 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     const currentHost = window.location.hostname;
     const currentUrl = window.location.href;
 
-    this.context.logger.debug(`Checking if Perplexity adapter supports: ${currentUrl}`);
+    this.context.logger.debug(`Checking if Z adapter supports: ${currentUrl}`);
 
     // Check hostname first
-    const isPerplexityHost = this.hostnames.some(hostname => {
+    const isZHost = this.hostnames.some(hostname => {
       if (typeof hostname === 'string') {
         return currentHost.includes(hostname);
       }
@@ -674,22 +716,20 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
       return (hostname as RegExp).test(currentHost);
     });
 
-    if (!isPerplexityHost) {
-      this.context.logger.debug(`Host ${currentHost} not supported by Perplexity adapter`);
+    if (!isZHost) {
+      this.context.logger.debug(`Host ${currentHost} not supported by Z adapter`);
       return false;
     }
 
-    // Check if we're on a supported Perplexity page
+    // Check if we're on a supported Z page
     const supportedPatterns = [
-      /^https:\/\/(?:www\.)?perplexity\.ai\/search\/.*/,  // Search pages
-      /^https:\/\/(?:www\.)?perplexity\.ai\/$/,           // Home page
-      /^https:\/\/(?:www\.)?perplexity\.ai\/library\/.*/  // Library pages
+      /^https:\/\/(?:chat\.)?z\.ai\/search\/.*/, // chat page
     ];
 
     const isSupported = supportedPatterns.some(pattern => pattern.test(currentUrl));
 
     if (isSupported) {
-      this.context.logger.debug(`Perplexity adapter supports current page: ${currentUrl}`);
+      this.context.logger.debug(`Z adapter supports current page: ${currentUrl}`);
     } else {
       this.context.logger.debug(`URL pattern not supported: ${currentUrl}`);
     }
@@ -702,7 +742,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
    * Enhanced with multiple selector checking and better detection
    */
   supportsFileUpload(): boolean {
-    this.context.logger.debug('Checking file upload support for Perplexity');
+    this.context.logger.debug('Checking file upload support for Z');
 
     // Check for file input elements
     const fileInputSelectors = this.selectors.FILE_INPUT.split(', ');
@@ -766,17 +806,17 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
       return;
     }
 
-    this.context.logger.debug(`Setting up store event listeners for Perplexity adapter instance #${this.instanceId}`);
+    this.context.logger.debug(`Setting up store event listeners for Z adapter instance #${this.instanceId}`);
 
     // Listen for tool execution events from the store
-    this.context.eventBus.on('tool:execution-completed', (data) => {
+    this.context.eventBus.on('tool:execution-completed', data => {
       this.context.logger.debug('Tool execution completed:', data);
       // Handle auto-actions based on store state
       this.handleToolExecutionCompleted(data);
     });
 
     // Listen for UI state changes
-    this.context.eventBus.on('ui:sidebar-toggle', (data) => {
+    this.context.eventBus.on('ui:sidebar-toggle', data => {
       this.context.logger.debug('Sidebar toggled:', data);
     });
 
@@ -789,13 +829,13 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
       return;
     }
 
-    this.context.logger.debug(`Setting up DOM observers for Perplexity adapter instance #${this.instanceId}`);
+    this.context.logger.debug(`Setting up DOM observers for Z adapter instance #${this.instanceId}`);
 
     // Set up mutation observer to detect page changes and re-inject UI if needed
-    this.mutationObserver = new MutationObserver((mutations) => {
+    this.mutationObserver = new MutationObserver(mutations => {
       let shouldReinject = false;
 
-      mutations.forEach((mutation) => {
+      mutations.forEach(mutation => {
         if (mutation.type === 'childList') {
           // Check if our MCP popover was removed
           if (!document.getElementById('mcp-popover-container')) {
@@ -819,7 +859,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
       childList: true,
       subtree: true
     });
-    
+
     this.domObserversSetup = true;
   }
 
@@ -827,19 +867,23 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     // Allow multiple calls for UI integration (for re-injection after page changes)
     // but log it for debugging
     if (this.uiIntegrationSetup) {
-      this.context.logger.debug(`UI integration already set up for instance #${this.instanceId}, re-injecting for page changes`);
+      this.context.logger.debug(
+        `UI integration already set up for instance #${this.instanceId}, re-injecting for page changes`,
+      );
     } else {
-      this.context.logger.debug(`Setting up UI integration for Perplexity adapter instance #${this.instanceId}`);
+      this.context.logger.debug(`Setting up UI integration for Z adapter instance #${this.instanceId}`);
       this.uiIntegrationSetup = true;
     }
 
     // Wait for page to be ready, then inject MCP popover
-    this.waitForPageReady().then(() => {
-      this.injectMCPPopoverWithRetry();
-    }).catch((error) => {
-      this.context.logger.warn('Failed to wait for page ready:', error);
-      // Don't retry if we can't find insertion point
-    });
+    this.waitForPageReady()
+      .then(() => {
+        this.injectMCPPopoverWithRetry();
+      })
+      .catch(error => {
+        this.context.logger.warn('Failed to wait for page ready:', error);
+        // Don't retry if we can't find insertion point
+      });
 
     // Set up periodic check to ensure popover stays injected
     // this.setupPeriodicPopoverCheck();
@@ -849,7 +893,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     return new Promise((resolve, reject) => {
       let attempts = 0;
       const maxAttempts = 5; // Maximum 10 seconds (20 * 500ms)
-      
+
       const checkReady = () => {
         attempts++;
         const insertionPoint = this.findButtonInsertionPoint();
@@ -910,7 +954,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
   }
 
   private cleanupDOMObservers(): void {
-    this.context.logger.debug('Cleaning up DOM observers for Perplexity adapter');
+    this.context.logger.debug('Cleaning up DOM observers for Z adapter');
 
     if (this.mutationObserver) {
       this.mutationObserver.disconnect();
@@ -919,7 +963,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
   }
 
   private cleanupUIIntegration(): void {
-    this.context.logger.debug('Cleaning up UI integration for Perplexity adapter');
+    this.context.logger.debug('Cleaning up UI integration for Z adapter');
 
     // Remove MCP popover if it exists
     const popoverContainer = document.getElementById('mcp-popover-container');
@@ -931,11 +975,11 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
   }
 
   private handleToolExecutionCompleted(data: any): void {
-    this.context.logger.debug('Handling tool execution completion in Perplexity adapter:', data);
+    this.context.logger.debug('Handling tool execution completion in Z adapter:', data);
 
     // Use the base class method to check if we should handle events
     if (!this.shouldHandleEvents()) {
-      this.context.logger.debug('Perplexity adapter should not handle events, ignoring tool execution event');
+      this.context.logger.debug('Z adapter should not handle events, ignoring tool execution event');
       return;
     }
 
@@ -952,11 +996,11 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     this.context.logger.debug('Finding button insertion point for MCP popover');
 
     // Try to find the search/research toggle area first (primary insertion point)
-    const radioGroup = document.querySelector('div[role="radiogroup"].group.relative.isolate.flex');
+    const radioGroup = document.querySelector(this.selectors.BUTTON_INSERTION_CONTAINER);
     if (radioGroup) {
-      const container = radioGroup.closest('.flex.items-center');
+      const container = radioGroup.closest('div.flex');
       if (container) {
-        this.context.logger.debug('Found search/research toggle container, placing MCP button next to it');
+        this.context.logger.debug('Found Tools container, placing MCP button next to it');
         const wrapperDiv = radioGroup.parentElement;
         return { container, insertAfter: wrapperDiv };
       }
@@ -971,11 +1015,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     }
 
     // Try fallback selectors
-    const fallbackSelectors = [
-      '.input-area .actions',
-      '.chat-input-actions',
-      '.conversation-input .actions'
-    ];
+    const fallbackSelectors = ['.input-area .actions', '.chat-input-actions', '.conversation-input .actions'];
 
     for (const selector of fallbackSelectors) {
       const container = document.querySelector(selector);
@@ -990,7 +1030,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
   }
 
   private injectMCPPopover(insertionPoint: { container: Element; insertAfter: Element | null }): void {
-    this.context.logger.debug('Injecting MCP popover into Perplexity interface');
+    this.context.logger.debug('Injecting MCP popover into Z interface');
 
     try {
       // Check if popover already exists
@@ -1032,40 +1072,46 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
 
     try {
       // Import React and ReactDOM dynamically to avoid bundling issues
-      import('react').then(React => {
-        import('react-dom/client').then(ReactDOM => {
-          import('../../components/mcpPopover/mcpPopover').then(({ MCPPopover }) => {
-            // Create toggle state manager that integrates with new stores
-            const toggleStateManager = this.createToggleStateManager();
+      import('react')
+        .then(React => {
+          import('react-dom/client')
+            .then(ReactDOM => {
+              import('../../components/mcpPopover/mcpPopover')
+                .then(({ MCPPopover }) => {
+                  // Create toggle state manager that integrates with new stores
+                  const toggleStateManager = this.createToggleStateManager();
 
-            // Create adapter button configuration
-            const adapterButtonConfig = {
-              className: 'mcp-perplexity-button-base',
-              contentClassName: 'mcp-perplexity-button-content',
-              textClassName: 'mcp-perplexity-button-text',
-              activeClassName: 'mcp-button-active'
-            };
+                  // Create adapter button configuration
+                  const adapterButtonConfig = {
+                    className: 'mcp-z-button-base',
+                    contentClassName: 'mcp-z-button-content',
+                    textClassName: 'mcp-z-button-text',
+                    activeClassName: 'mcp-button-active',
+                  };
 
-            // Create React root and render
-            const root = ReactDOM.createRoot(container);
-            root.render(
-              React.createElement(MCPPopover, {
-                toggleStateManager: toggleStateManager,
-                adapterButtonConfig: adapterButtonConfig,
-                adapterName: this.name
-              })
-            );
+                  // Create React root and render
+                  const root = ReactDOM.createRoot(container);
+                  root.render(
+                    React.createElement(MCPPopover, {
+                      toggleStateManager: toggleStateManager,
+                      adapterButtonConfig: adapterButtonConfig,
+                      adapterName: this.name,
+                    }),
+                  );
 
-            this.context.logger.debug('MCP popover rendered successfully with new architecture');
-          }).catch(error => {
-            this.context.logger.error('Failed to import MCPPopover component:', error);
-          });
-        }).catch(error => {
-          this.context.logger.error('Failed to import ReactDOM:', error);
+                  this.context.logger.debug('MCP popover rendered successfully with new architecture');
+                })
+                .catch(error => {
+                  this.context.logger.error('Failed to import MCPPopover component:', error);
+                });
+            })
+            .catch(error => {
+              this.context.logger.error('Failed to import ReactDOM:', error);
+            });
+        })
+        .catch(error => {
+          this.context.logger.error('Failed to import React:', error);
         });
-      }).catch(error => {
-        this.context.logger.error('Failed to import React:', error);
-      });
     } catch (error) {
       this.context.logger.error('Failed to render MCP popover:', error);
     }
@@ -1081,7 +1127,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
         try {
           // Get state from UI store - MCP enabled state should be the persistent MCP toggle state
           const uiState = context.stores.ui;
-          
+
           // Get the persistent MCP enabled state and other preferences
           const mcpEnabled = uiState?.mcpEnabled ?? false;
           const autoSubmitEnabled = uiState?.preferences?.autoSubmit ?? false;
@@ -1092,7 +1138,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
             mcpEnabled: mcpEnabled, // Use the persistent MCP state
             autoInsert: autoSubmitEnabled,
             autoSubmit: autoSubmitEnabled,
-            autoExecute: false // Default for now, can be extended
+            autoExecute: false, // Default for now, can be extended
           };
         } catch (error) {
           context.logger.error('Error getting toggle state:', error);
@@ -1101,13 +1147,15 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
             mcpEnabled: false,
             autoInsert: false,
             autoSubmit: false,
-            autoExecute: false
+            autoExecute: false,
           };
         }
       },
 
       setMCPEnabled: (enabled: boolean) => {
-        context.logger.debug(`Setting MCP ${enabled ? 'enabled' : 'disabled'} - controlling sidebar visibility via MCP state`);
+        context.logger.debug(
+          `Setting MCP ${enabled ? 'enabled' : 'disabled'} - controlling sidebar visibility via MCP state`,
+        );
 
         try {
           // Primary method: Control MCP state through UI store (which will automatically control sidebar)
@@ -1116,7 +1164,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
             context.logger.debug(`MCP state set to: ${enabled} via UI store`);
           } else {
             context.logger.warn('UI store setMCPEnabled method not available');
-            
+
             // Fallback: Control sidebar visibility directly if MCP state setter not available
             if (context.stores.ui?.setSidebarVisibility) {
               context.stores.ui.setSidebarVisibility(enabled, 'mcp-popover-toggle-fallback');
@@ -1142,7 +1190,9 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
             context.logger.warn('activeSidebarManager not available on window - will rely on UI store only');
           }
 
-          context.logger.debug(`MCP toggle completed: MCP ${enabled ? 'enabled' : 'disabled'}, sidebar ${enabled ? 'shown' : 'hidden'}`);
+          context.logger.debug(
+            `MCP toggle completed: MCP ${enabled ? 'enabled' : 'disabled'}, sidebar ${enabled ? 'shown' : 'hidden'}`,
+          );
         } catch (error) {
           context.logger.error('Error in setMCPEnabled:', error);
         }
@@ -1186,11 +1236,11 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
         if (popoverContainer) {
           const currentState = stateManager.getState();
           const event = new CustomEvent('mcp:update-toggle-state', {
-            detail: { toggleState: currentState }
+            detail: { toggleState: currentState },
           });
           popoverContainer.dispatchEvent(event);
         }
-      }
+      },
     };
 
     return stateManager;
@@ -1228,12 +1278,12 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     this.context.eventBus.emit('tool:execution-failed', {
       toolName,
       error,
-      callId: this.generateCallId()
+      callId: this.generateCallId(),
     });
   }
 
   private generateCallId(): string {
-    return `perplexity-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    return `z-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   }
 
   /**
@@ -1245,7 +1295,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     try {
       // Check if there's an active sidebar manager
       const activeSidebarManager = (window as any).activeSidebarManager;
-      
+
       if (!activeSidebarManager) {
         this.context.logger.warn('No active sidebar manager found after navigation');
         return;
@@ -1253,7 +1303,6 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
 
       // Sidebar manager exists, just ensure MCP popover connection is working
       this.ensureMCPPopoverConnection();
-      
     } catch (error) {
       this.context.logger.error('Error checking sidebar state after navigation:', error);
     }
@@ -1264,7 +1313,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
    */
   private ensureMCPPopoverConnection(): void {
     this.context.logger.debug('Ensuring MCP popover connection after navigation');
-    
+
     try {
       // Check if MCP popover is still injected
       if (!this.isMCPPopoverInjected()) {
@@ -1280,7 +1329,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
 
   // Event handlers - Enhanced for new architecture integration
   onPageChanged?(url: string, oldUrl?: string): void {
-    this.context.logger.debug(`Perplexity page changed: from ${oldUrl || 'N/A'} to ${url}`);
+    this.context.logger.debug(`Z page changed: from ${oldUrl || 'N/A'} to ${url}`);
 
     // Update URL tracking
     this.lastUrl = url;
@@ -1290,7 +1339,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     if (stillSupported) {
       // Re-inject styles on page navigation
       this.adapterStylesInjected = false;
-      this.injectPerplexityButtonStyles();
+      this.injectZButtonStyles();
 
       // Re-setup UI integration after page change
       setTimeout(() => {
@@ -1308,21 +1357,21 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     // Emit page change event to stores
     this.context.eventBus.emit('app:site-changed', {
       site: url,
-      hostname: window.location.hostname
+      hostname: window.location.hostname,
     });
   }
 
   onHostChanged?(newHost: string, oldHost?: string): void {
-    this.context.logger.debug(`Perplexity host changed: from ${oldHost || 'N/A'} to ${newHost}`);
+    this.context.logger.debug(`Z host changed: from ${oldHost || 'N/A'} to ${newHost}`);
 
     // Re-check if the adapter is still supported
     const stillSupported = this.isSupported();
     if (!stillSupported) {
-      this.context.logger.warn('Perplexity adapter no longer supported on this host/page');
+      this.context.logger.warn('Z adapter no longer supported on this host/page');
       // Emit deactivation event using available event type
       this.context.eventBus.emit('adapter:deactivated', {
         pluginName: this.name,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     } else {
       // Re-setup for new host
@@ -1331,7 +1380,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
   }
 
   onToolDetected?(tools: any[]): void {
-    this.context.logger.debug(`Tools detected in Perplexity adapter:`, tools);
+    this.context.logger.debug(`Tools detected in Z adapter:`, tools);
 
     // Forward to tool store
     tools.forEach(tool => {
@@ -1339,15 +1388,15 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
     });
   }
 
-  // Perplexity-specific button styling methods
+  // Z-specific button styling methods
 
   /**
-   * Get Perplexity-specific button styles that match the platform's segmented control design system
+   * Get Z-specific button styles that match the platform's segmented control design system
    */
-  private getPerplexityButtonStyles(): string {
+  private getZButtonStyles(): string {
     return `
-      .mcp-perplexity-button-base {
-        /* Base button styling matching Perplexity's segmented-control design */
+      .mcp-z-button-base {
+        /* Base button styling matching Z's segmented-control design */
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -1367,7 +1416,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
         background: transparent;
         transition: all 300ms ease-out;
         
-        /* Default colors - using Perplexity's actual theme colors */
+        /* Default colors - using Z's actual theme colors */
         color: oklch(var(--text-color-200, 50.2% 0.008 106.677)); /* Inactive text */
         
         /* Focus states */
@@ -1402,7 +1451,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
       
       /* Dark mode support */
       @media (prefers-color-scheme: dark) {
-        .mcp-perplexity-button-base {
+        .mcp-z-button-base {
           color: oklch(var(--dark-text-color-200, 65.3% 0.005 197.042)); /* Dark mode inactive text */
           
           &:hover {
@@ -1421,7 +1470,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
         }
       }
       
-      .mcp-perplexity-button-content {
+      .mcp-z-button-content {
         /* Content container styling - matches the inner div structure */
         display: flex;
         align-items: center;
@@ -1436,7 +1485,7 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
         padding: 4px 10px; /* matches py-xs px-2.5 equivalent */
       }
       
-      .mcp-perplexity-button-text {
+      .mcp-z-button-text {
         font-size: 14px;
         font-weight: 500;
         line-height: 1.2;
@@ -1444,66 +1493,66 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
       }
       
       /* Icon styling within button */
-      .mcp-perplexity-button-base svg,
-      .mcp-perplexity-button-base img {
+      .mcp-z-button-base svg,
+      .mcp-z-button-base img {
         width: 16px;
         height: 16px;
         transition: all 300ms ease-out;
         flex-shrink: 0;
       }
       
-      .mcp-perplexity-button-base img {
+      .mcp-z-button-base img {
         border-radius: 50%;
         margin-right: 1px;
       }
       
-      /* Integration with Perplexity's button group layout */
-      .gap-xs .mcp-perplexity-button-base,
-      .gap-sm .mcp-perplexity-button-base,
-      .flex.items-center .mcp-perplexity-button-base {
+      /* Integration with Z's button group layout */
+      .gap-xs .mcp-z-button-base,
+      .gap-sm .mcp-z-button-base,
+      .flex.items-center .mcp-z-button-base {
         margin: 0 2px;
       }
       
       /* Special styling for group context (matches p-two flex items-center structure) */
-      .p-two .mcp-perplexity-button-base,
-      [class*="p-"] .mcp-perplexity-button-base {
+      .p-two .mcp-z-button-base,
+      [class*="p-"] .mcp-z-button-base {
         margin: 0 1px;
       }
       
       /* Focus-visible styling for accessibility */
-      .mcp-perplexity-button-base:focus-visible {
+      .mcp-z-button-base:focus-visible {
         outline: 2px solid oklch(var(--text-super-color-100, 55.3% 0.086 208.538));
         outline-offset: 2px;
         outline-style: dashed;
       }
       
-      .mcp-perplexity-button-base:focus-visible::before {
+      .mcp-z-button-base:focus-visible::before {
         border-style: dashed !important;
       }
       
       /* Responsive adjustments */
       @media (max-width: 640px) {
-        .mcp-perplexity-button-base {
+        .mcp-z-button-base {
           height: 28px;
           min-width: 32px;
           padding: 0 8px;
           font-size: 13px;
         }
         
-        .mcp-perplexity-button-content {
+        .mcp-z-button-content {
           height: 28px;
           min-width: 32px;
           padding: 2px 8px;
         }
         
-        .mcp-perplexity-button-base svg,
-        .mcp-perplexity-button-base img {
+        .mcp-z-button-base svg,
+        .mcp-z-button-base img {
           width: 14px;
           height: 14px;
         }
         
         /* Adjust ring size for mobile */
-        .mcp-perplexity-button-base.mcp-button-active::before {
+        .mcp-z-button-base.mcp-button-active::before {
           border-width: 1px; /* Keep consistent border width on mobile */
         }
       }
@@ -1512,25 +1561,25 @@ export class PerplexityAdapter extends BaseAdapterPlugin {
   }
 
   /**
-   * Inject Perplexity-specific button styles into the page
+   * Inject Z-specific button styles into the page
    */
-  private injectPerplexityButtonStyles(): void {
+  private injectZButtonStyles(): void {
     if (this.adapterStylesInjected) return;
-    
+
     try {
-      const styleId = 'mcp-perplexity-button-styles';
+      const styleId = 'mcp-z-button-styles';
       const existingStyles = document.getElementById(styleId);
       if (existingStyles) existingStyles.remove();
-      
+
       const styleElement = document.createElement('style');
       styleElement.id = styleId;
-      styleElement.textContent = this.getPerplexityButtonStyles();
+      styleElement.textContent = this.getZButtonStyles();
       document.head.appendChild(styleElement);
-      
+
       this.adapterStylesInjected = true;
-      this.context.logger.debug('Perplexity button styles injected successfully');
+      this.context.logger.debug('Z button styles injected successfully');
     } catch (error) {
-      this.context.logger.error('Failed to inject Perplexity button styles:', error);
+      this.context.logger.error('Failed to inject Z button styles:', error);
     }
   }
 }

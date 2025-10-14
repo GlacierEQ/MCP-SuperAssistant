@@ -45,6 +45,9 @@ const manifest = {
     '*://*.github.com/*',
     '*://*.copilot.github.com/*',
     '*://*.kimi.com/*',
+    '*://*.chat.z.ai/*',
+    '*://*.chat.qwen.ai/*',
+
   ],
 
   permissions: ['storage', 'clipboardWrite'],
@@ -149,6 +152,18 @@ const manifest = {
       js: ['content/index.iife.js'],
       run_at: 'document_idle',
     },
+    // Specific content script for chat.z.ai
+    {
+      matches: ['*://*.chat.z.ai/*'],
+      js: ['content/index.iife.js'],
+      run_at: 'document_idle',
+    },
+    {
+      matches: ['*://*.chat.qwen.ai/*'],
+      js: ['content/index.iife.js'],
+      run_at: 'document_idle',
+    },
+
   ],
   // devtools_page: 'devtools/index.html',
   web_accessible_resources: [
