@@ -81,8 +81,10 @@ export const WEBSITE_CONFIGS: Array<{
   {
     urlPattern: 'gemini',
     config: {
-      targetSelectors: ['code-block'],
-      streamingContainerSelectors: ['.code-block'],
+      // targetSelectors: ['code-block'],
+      // streamingContainerSelectors: ['.code-block'],
+      targetSelectors: ['pre'],
+      streamingContainerSelectors: ['pre'],
       function_result_selector: ['div.query-content'],
     },
   },
@@ -134,8 +136,8 @@ export const WEBSITE_CONFIGS: Array<{
       {
         urlPattern: 'chat.deepseek.com',
         config: {
-      targetSelectors: ['pre'],
-      streamingContainerSelectors: ['pre'],
+      targetSelectors: ['pre','code'],
+      streamingContainerSelectors: ['pre','code'],
       function_result_selector: ['div._9663006'],
         },
       },
@@ -185,8 +187,8 @@ export const WEBSITE_CONFIGS: Array<{
         {
         urlPattern: 'chat.qwen.ai',
         config: {
-      targetSelectors: ['pre'],
-      streamingContainerSelectors: ['pre'],
+      targetSelectors: ['pre','code',],
+      streamingContainerSelectors: ['pre','code'],
       function_result_selector: ['.user-message-text-content', 'div.user-message-content'],
       // function_result_selector: ['div.chat-user'],
       useCodeMirrorExtraction: true

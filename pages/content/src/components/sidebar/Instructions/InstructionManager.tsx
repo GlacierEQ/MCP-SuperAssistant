@@ -1,13 +1,18 @@
 import type React from 'react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { generateInstructions } from './instructionGenerator';
+import { generateInstructionsJson } from './instructionGeneratorJson';
 import { useUserPreferences, useToolEnablement } from '../../../hooks';
 import { useToolStore } from '../../../stores/tool.store';
 import { Typography } from '../ui';
 import { cn } from '@src/lib/utils';
 import { logMessage } from '@src/utils/helpers';
+import { createLogger } from '@extension/shared/lib/logger';
 
 // Create a global shared state for instructions
+
+const logger = createLogger('InstructionManager');
+
 export const instructionsState = {
   instructions: '',
   updating: false, // Flag to prevent circular updates
@@ -19,7 +24,7 @@ export const instructionsState = {
 
     // Prevent recursive updates
     if (instructionsState.updating) {
-      console.warn('[InstructionsState] Prevented recursive update');
+      logger.warn('[InstructionsState] Prevented recursive update');
       return;
     }
 
@@ -27,7 +32,7 @@ export const instructionsState = {
     instructionsState.updating = true;
     instructionsState.instructions = newInstructions;
 
-    console.debug(`[InstructionsState] Broadcasting instruction update to ${instructionsState.listeners.length} listeners`);
+    logger.debug(`Broadcasting instruction update to ${instructionsState.listeners.length} listeners`);
 
     // Call all registered listeners when instructions change
     try {
@@ -35,7 +40,7 @@ export const instructionsState = {
         try {
           listener(newInstructions);
         } catch (error) {
-          console.error(`[InstructionsState] Error in listener ${index}:`, error);
+          logger.error(`Error in listener ${index}:`, error);
         }
       });
     } finally {
@@ -46,13 +51,13 @@ export const instructionsState = {
   listeners: [] as ((instructions: string) => void)[],
   subscribe: (listener: (instructions: string) => void) => {
     instructionsState.listeners.push(listener);
-    console.debug(`[InstructionsState] Listener subscribed (total: ${instructionsState.listeners.length})`);
+    logger.debug(`Listener subscribed (total: ${instructionsState.listeners.length})`);
     // Return unsubscribe function
     return () => {
       const index = instructionsState.listeners.indexOf(listener);
       if (index !== -1) {
         instructionsState.listeners.splice(index, 1);
-        console.debug(`[InstructionsState] Listener unsubscribed (total: ${instructionsState.listeners.length})`);
+        logger.debug(`Listener unsubscribed (total: ${instructionsState.listeners.length})`);
       }
     };
   },
@@ -151,7 +156,13 @@ const InstructionManager: React.FC<InstructionManagerProps> = ({ adapter, tools 
 
   // Generate instructions with custom instructions - memoized to prevent excessive calls
   const generateCurrentInstructions = useCallback(() => {
-    return generateInstructions(enabledTools, customInstructions, customInstructionsEnabled);
+    // return generateInstructions(enabledTools, customInstructions, customInstructionsEnabled);
+
+    // if (adapter.name === 'OpenRouterAdapter') {
+    //   return generateInstructions(enabledTools, customInstructions, customInstructionsEnabled);
+    // }
+
+    return generateInstructionsJson(enabledTools, customInstructions, customInstructionsEnabled);
   }, [enabledTools, customInstructions, customInstructionsEnabled]);
 
   // Memoize the actual current instructions to prevent unnecessary re-calculations
@@ -264,7 +275,7 @@ const InstructionManager: React.FC<InstructionManagerProps> = ({ adapter, tools 
       setInsertSuccess(true);
       setTimeout(() => setInsertSuccess(false), 2000);
     } catch (error) {
-      console.error('Error inserting instructions:', error);
+      logger.error('Error inserting instructions:', error);
     } finally {
       setIsInserting(false);
     }
@@ -281,7 +292,7 @@ const InstructionManager: React.FC<InstructionManagerProps> = ({ adapter, tools 
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
     } catch (error) {
-      console.error('Error copying instructions to clipboard:', error);
+      logger.error('Error copying instructions to clipboard:', error);
     } finally {
       setIsCopying(false);
     }
@@ -305,7 +316,7 @@ const InstructionManager: React.FC<InstructionManagerProps> = ({ adapter, tools 
       setAttachSuccess(true);
       setTimeout(() => setAttachSuccess(false), 2000);
     } catch (error) {
-      console.error('Error attaching instructions as file:', error);
+      logger.error('Error attaching instructions as file:', error);
     } finally {
       setIsAttaching(false);
     }

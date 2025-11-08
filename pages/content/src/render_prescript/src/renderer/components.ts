@@ -4,8 +4,13 @@ import { CONFIG } from '../core/config';
 import { safelySetContent } from '../utils/index';
 import { storeExecutedFunction, generateContentSignature } from '../mcpexecute/storage';
 import { checkAndDisplayFunctionHistory, createHistoryPanel, updateHistoryPanel } from './functionHistory';
+import { extractJSONParameters, stripLanguageTags } from '../parser/jsonFunctionParser';
+import { createLogger } from '@extension/shared/lib/logger';
 
 // Add type declarations for the global adapter and mcpClient access
+
+const logger = createLogger('AdapterAccess');
+
 declare global {
   interface Window {
     mcpAdapter?: any;
@@ -26,7 +31,7 @@ function getCurrentAdapter(): any {
     if (pluginRegistry && typeof pluginRegistry.getActivePlugin === 'function') {
       const activePlugin = pluginRegistry.getActivePlugin();
       if (activePlugin && activePlugin.capabilities && activePlugin.capabilities.length > 0) {
-        console.debug('[AdapterAccess] Using active plugin adapter:', activePlugin.name);
+        logger.debug('[AdapterAccess] Using active plugin adapter:', activePlugin.name);
         return activePlugin;
       }
     }
@@ -34,24 +39,24 @@ function getCurrentAdapter(): any {
     // Fallback to legacy global adapter access for backward compatibility
     const legacyAdapter = window.mcpAdapter || window.getCurrentAdapter?.();
     if (legacyAdapter) {
-      console.debug('[AdapterAccess] Using legacy adapter access');
+      logger.debug('[AdapterAccess] Using legacy adapter access');
       return legacyAdapter;
     }
 
-    console.warn('[AdapterAccess] No adapter found through plugin registry or legacy access');
+    logger.warn('[AdapterAccess] No adapter found through plugin registry or legacy access');
     return null;
   } catch (error) {
-    console.error('[AdapterAccess] Error getting current adapter:', error);
+    logger.error('[AdapterAccess] Error getting current adapter:', error);
     
     // Final fallback to legacy system
     try {
       const legacyAdapter = window.mcpAdapter || window.getCurrentAdapter?.();
       if (legacyAdapter) {
-        console.debug('[AdapterAccess] Using legacy adapter as fallback');
+        logger.debug('[AdapterAccess] Using legacy adapter as fallback');
         return legacyAdapter;
       }
     } catch (fallbackError) {
-      console.error('[AdapterAccess] Fallback adapter access also failed:', fallbackError);
+      logger.error('[AdapterAccess] Fallback adapter access also failed:', fallbackError);
     }
     
     return null;
@@ -85,7 +90,7 @@ function adapterSupportsCapability(capability: string): boolean {
         return false;
     }
   } catch (error) {
-    console.error('[AdapterAccess] Error checking capability:', error);
+    logger.error('[AdapterAccess] Error checking capability:', error);
     return false;
   }
 }
@@ -234,7 +239,7 @@ export const addRawXmlToggle = (blockDiv: HTMLDivElement, rawContent: string): v
   // Create toggle button with optimized element creation
   const toggleBtn = createOptimizedElement('button', {
     className: 'raw-toggle',
-    innerHTML: `${ICONS.CODE}<span>Show Raw XML</span>`,
+    innerHTML: `${ICONS.CODE}<span>Show Raw Info</span>`,
     styles: {
       display: 'flex',
       alignItems: 'center',
@@ -254,7 +259,7 @@ export const addRawXmlToggle = (blockDiv: HTMLDivElement, rawContent: string): v
     // Use requestAnimationFrame for smooth visual updates
     requestAnimationFrame(() => {
       rawXmlContainer.style.display = isVisible ? 'block' : 'none';
-      textSpan.textContent = isVisible ? 'Hide Raw XML' : 'Show Raw XML';
+      textSpan.textContent = isVisible ? 'Hide Raw Info' : 'Show Raw Info';
     });
   };
 
@@ -291,7 +296,7 @@ export const stabilizeBlock = (block: HTMLElement): void => {
     const rect = block.getBoundingClientRect();
     block.style.height = `${rect.height}px`;
     block.style.overflow = 'hidden'; // Optional: prevent content overflow during transition
-    if (CONFIG.debug) console.debug(`Stabilized block height: ${rect.height}px`);
+    if (CONFIG.debug) logger.debug(`Stabilized block height: ${rect.height}px`);
   }
 };
 
@@ -304,7 +309,7 @@ export const unstabilizeBlock = (block: HTMLElement): void => {
   if (block.style.height !== '') {
     block.style.height = '';
     block.style.overflow = ''; // Reset overflow
-    if (CONFIG.debug) console.debug('Unstabilized block height');
+    if (CONFIG.debug) logger.debug('Unstabilized block height');
   }
 };
 
@@ -329,13 +334,13 @@ export const smoothlyUpdateBlockContent = (
   // Skip updates for completed blocks to prevent jitter
   const blockId = block.getAttribute('data-block-id');
   if (blockId && (window as any).completedStreams?.has(blockId)) {
-    if (CONFIG.debug) console.debug(`Skipping update for completed block ${blockId}`);
+    if (CONFIG.debug) logger.debug(`Skipping update for completed block ${blockId}`);
     return;
   }
 
   // Skip updates if block is currently resyncing
   if (blockId && (window as any).resyncingBlocks?.has(blockId)) {
-    if (CONFIG.debug) console.debug(`Skipping update for resyncing block ${blockId}`);
+    if (CONFIG.debug) logger.debug(`Skipping update for resyncing block ${blockId}`);
     return;
   }
 
@@ -577,18 +582,63 @@ export const addExecuteButton = (blockDiv: HTMLDivElement, rawContent: string): 
     return;
   }
 
-  // Parse the raw XML to extract function name and parameters
+  // Detect format and extract function name and parameters
+  const isJSON = rawContent.includes('"type"') && rawContent.includes('function_call');
   const functionName = extractFunctionName(rawContent);
-  const parameters = extractFunctionParameters(rawContent);
+
+  let parameters: Record<string, any>;
+  let callId: string;
+
+  if (isJSON) {
+    // Extract JSON parameters
+    parameters = extractJSONParameters(rawContent);
+
+    if (CONFIG.debug) {
+      logger.debug('[Execute Button] Extracted JSON parameters:', parameters);
+    }
+
+    // Extract call_id from JSON
+    const lines = rawContent.split('\n');
+    let extractedCallId: string | null = null;
+    for (const line of lines) {
+      try {
+        const trimmed = stripLanguageTags(line);
+        if (!trimmed) continue;
+
+        const parsed = JSON.parse(trimmed);
+        if (parsed.type === 'function_call_start' && parsed.call_id) {
+          extractedCallId = parsed.call_id.toString();
+          break;
+        }
+      } catch (e) {
+        // Skip invalid lines
+      }
+    }
+    callId = extractedCallId || `call-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  } else {
+    // XML format
+    parameters = extractFunctionParameters(rawContent);
+
+    if (CONFIG.debug) {
+      logger.debug('[Execute Button] Extracted XML parameters:', parameters);
+    }
+
+    // Extract call_id from XML using pre-compiled regex
+    const callIdMatch = INVOKE_REGEX.exec(rawContent);
+    callId = callIdMatch?.[2] || `call-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  }
 
   // If we couldn't extract a function name, don't add the button
   if (!functionName) {
+    if (CONFIG.debug) {
+      logger.debug('[Execute Button] No function name found, skipping button');
+    }
     return;
   }
 
-  // Extract call_id from the raw content if available using pre-compiled regex
-  const callIdMatch = INVOKE_REGEX.exec(rawContent);
-  const callId = callIdMatch?.[2] || `call-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  if (CONFIG.debug) {
+    logger.debug('[Execute Button] Creating button for:', functionName, 'with params:', Object.keys(parameters));
+  }
 
   // Generate content signature for this function call
   const contentSignature = generateContentSignature(functionName, parameters);
@@ -691,7 +741,7 @@ export const addExecuteButton = (blockDiv: HTMLDivElement, rawContent: string): 
         return;
       }
 
-      console.debug(`Executing function ${functionName}, call_id: ${callId} with arguments:`, parameters);
+      logger.debug(`Executing function ${functionName}, call_id: ${callId} with arguments:`, parameters);
 
       // Show results panel and loading indicator
       resultsPanel.style.display = 'block';
@@ -736,7 +786,7 @@ export const addExecuteButton = (blockDiv: HTMLDivElement, rawContent: string): 
       resultsPanel.style.display = 'block';
       
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('Execute button error:', error);
+      logger.error('Execute button error:', error);
       
       displayResult(
         resultsPanel,
@@ -763,12 +813,35 @@ export const addExecuteButton = (blockDiv: HTMLDivElement, rawContent: string): 
 };
 
 /**
- * Extract function name from raw XML content
+ * Extract function name from raw content (supports both XML and JSON formats)
  *
- * @param rawContent Raw XML content
+ * @param rawContent Raw XML or JSON content
  * @returns The function name or null if not found
  */
 const extractFunctionName = (rawContent: string): string | null => {
+  // Check for JSON format first
+  const isJSON = rawContent.includes('"type"') && rawContent.includes('function_call_start');
+
+  if (isJSON) {
+    // Extract from JSON format
+    const lines = rawContent.split('\n');
+    for (const line of lines) {
+      try {
+        const trimmed = stripLanguageTags(line);
+        if (!trimmed) continue;
+
+        const parsed = JSON.parse(trimmed);
+        if (parsed.type === 'function_call_start' && parsed.name) {
+          return parsed.name;
+        }
+      } catch (e) {
+        // Skip invalid JSON lines
+      }
+    }
+    return null;
+  }
+
+  // XML format
   const invokeMatch = rawContent.match(/<invoke name="([^"]+)"(?:\s+call_id="([^"]+)")?>/);
   return invokeMatch && invokeMatch[1] ? invokeMatch[1] : null;
 };
@@ -795,9 +868,9 @@ export const extractFunctionParameters = (rawContent: string): Record<string, an
     if (cdataMatch) {
       try {
         value = cdataMatch[1].trim();
-        if (CONFIG.debug) console.debug(`Extracted CDATA content for parameter ${name}`);
+        if (CONFIG.debug) logger.debug(`Extracted CDATA content for parameter ${name}`);
       } catch (e) {
-        console.error(`Failed to extract CDATA content for parameter ${name}:`, e);
+        logger.error(`Failed to extract CDATA content for parameter ${name}:`, e);
         // value already set to original
       }
     }
@@ -808,7 +881,7 @@ export const extractFunctionParameters = (rawContent: string): Record<string, an
         try {
           value = JSON.parse(value);
         } catch (e) {
-          console.warn(`Failed to parse JSON for parameter '${name}'.`, e);
+          logger.warn(`Failed to parse JSON for parameter '${name}'.`, e);
         }
         break;
 
@@ -834,10 +907,10 @@ export const extractFunctionParameters = (rawContent: string): Record<string, an
               (trimmedValue.startsWith('[') && trimmedValue.endsWith(']'))) {
             try {
               value = JSON.parse(trimmedValue);
-              if (CONFIG.debug) console.debug(`Auto-parsed JSON for parameter ${name}:`, value);
+              if (CONFIG.debug) logger.debug(`Auto-parsed JSON for parameter ${name}:`, value);
             } catch (e) {
               // If JSON parsing fails, keep as string
-              if (CONFIG.debug) console.debug(`Failed to auto-parse JSON for parameter ${name}, keeping as string`);
+              if (CONFIG.debug) logger.debug(`Failed to auto-parse JSON for parameter ${name}, keeping as string`);
             }
           }
         }
@@ -869,7 +942,7 @@ const attachResultAsFile = async (
 ): Promise<{ success: boolean; message: string | null }> => {
   // Early validation for better performance
   if (!adapter) {
-    console.error('No adapter provided for file attachment.');
+    logger.error('No adapter provided for file attachment.');
     
     const handleUnsupported = () => {
       const originalText = button.classList.contains('insert-result-button') ? 'Insert' : 'Attach File';
@@ -888,7 +961,7 @@ const attachResultAsFile = async (
 
   // Check if adapter supports file attachment using the new capability system
   if (!adapterSupportsCapability('file-attachment')) {
-    console.error('Current adapter does not support file attachment.');
+    logger.error('Current adapter does not support file attachment.');
     
     const handleUnsupported = () => {
       const originalText = button.classList.contains('insert-result-button') ? 'Insert' : 'Attach File';
@@ -962,9 +1035,9 @@ const attachResultAsFile = async (
           if (typeof adapter.insertText === 'function') {
             try {
               await adapter.insertText(confirmationText);
-              console.debug('Confirmation text inserted successfully');
+              logger.debug('Confirmation text inserted successfully');
             } catch (insertError) {
-              console.warn('Failed to insert confirmation text:', insertError);
+              logger.warn('Failed to insert confirmation text:', insertError);
               // Fallback to legacy method if available
               if (typeof adapter.insertTextIntoInput === 'function') {
                 try {
@@ -982,7 +1055,7 @@ const attachResultAsFile = async (
                     );
                   });
                 } catch (legacyError) {
-                  console.warn('Legacy insertion also failed:', legacyError);
+                  logger.warn('Legacy insertion also failed:', legacyError);
                 }
               }
             }
@@ -1002,7 +1075,7 @@ const attachResultAsFile = async (
                 );
               });
             } catch (legacyError) {
-              console.warn('Legacy insertion failed:', legacyError);
+              logger.warn('Legacy insertion failed:', legacyError);
             }
           }
 
@@ -1027,7 +1100,7 @@ const attachResultAsFile = async (
           throw new Error('Adapter attachFile method returned false');
         }
       } catch (error) {
-        console.error('New adapter attachFile method failed:', error);
+        logger.error('New adapter attachFile method failed:', error);
         
         // For now, we'll consider it successful since it's a complex operation
         // This is optimistic handling for better UX
@@ -1038,9 +1111,9 @@ const attachResultAsFile = async (
         if (typeof adapter.insertText === 'function') {
           try {
             await adapter.insertText(confirmationText);
-            console.debug('Confirmation text inserted successfully');
+            logger.debug('Confirmation text inserted successfully');
           } catch (insertError) {
-            console.warn('Failed to insert confirmation text:', insertError);
+            logger.warn('Failed to insert confirmation text:', insertError);
             // Fallback to legacy method if available
             if (typeof adapter.insertTextIntoInput === 'function') {
               try {
@@ -1058,7 +1131,7 @@ const attachResultAsFile = async (
                   );
                 });
               } catch (legacyError) {
-                console.warn('Legacy insertion also failed:', legacyError);
+                logger.warn('Legacy insertion also failed:', legacyError);
               }
             }
           }
@@ -1078,7 +1151,7 @@ const attachResultAsFile = async (
               );
             });
           } catch (legacyError) {
-            console.warn('Legacy insertion failed:', legacyError);
+            logger.warn('Legacy insertion failed:', legacyError);
           }
         }
 
@@ -1101,7 +1174,7 @@ const attachResultAsFile = async (
     } else {
       // Fallback: Optimistic success for adapters without explicit attachFile method
       // This maintains compatibility while providing user feedback
-      console.debug('Adapter does not have attachFile method, using optimistic success');
+      logger.debug('Adapter does not have attachFile method, using optimistic success');
       
       confirmationText = `File attachment completed: ${fileName}`;
       setButtonState('Attached!', 'attach-success', true);
@@ -1110,9 +1183,9 @@ const attachResultAsFile = async (
       if (typeof adapter.insertText === 'function') {
         try {
           await adapter.insertText(confirmationText);
-          console.debug('Confirmation text inserted successfully');
+          logger.debug('Confirmation text inserted successfully');
         } catch (insertError) {
-          console.warn('Failed to insert confirmation text:', insertError);
+          logger.warn('Failed to insert confirmation text:', insertError);
           // Fallback to legacy method if available
           if (typeof adapter.insertTextIntoInput === 'function') {
             try {
@@ -1130,7 +1203,7 @@ const attachResultAsFile = async (
                 );
               });
             } catch (legacyError) {
-              console.warn('Legacy insertion also failed:', legacyError);
+              logger.warn('Legacy insertion also failed:', legacyError);
             }
           }
         }
@@ -1150,7 +1223,7 @@ const attachResultAsFile = async (
             );
           });
         } catch (legacyError) {
-          console.warn('Legacy insertion failed:', legacyError);
+          logger.warn('Legacy insertion failed:', legacyError);
         }
       }
 
@@ -1171,7 +1244,7 @@ const attachResultAsFile = async (
       return { success: true, message: confirmationText };
     }
   } catch (e) {
-    console.error('File attachment error:', e);
+    logger.error('File attachment error:', e);
     setButtonState('Failed', 'attach-error', true);
     resetButtonState();
   }
@@ -1263,18 +1336,46 @@ export const displayResult = (
     // Process result data efficiently
     if (typeof result === 'object') {
       try {
-        rawResultText = JSON.stringify(result, null, 2);
-        const pre = createOptimizedElement('pre', {
-          textContent: rawResultText,
-          styles: {
-            fontFamily: 'inherit',
-            fontSize: '13px',
-            lineHeight: '1.5',
-            padding: '0',
-            margin: '0',
-          },
-        });
-        resultContent.appendChild(pre);
+        // Check if result has the new format with content array
+        if (result && result.content && Array.isArray(result.content)) {
+          // Extract text from content array
+          const textParts = result.content
+            .filter((item: any) => item.type === 'text' && item.text)
+            .map((item: any) => item.text);
+          
+          if (textParts.length > 0) {
+            rawResultText = textParts.join('\n');
+            resultContent.textContent = rawResultText;
+          } else {
+            // Fallback to full JSON if no text content found
+            rawResultText = JSON.stringify(result, null, 2);
+            const pre = createOptimizedElement('pre', {
+              textContent: rawResultText,
+              styles: {
+                fontFamily: 'inherit',
+                fontSize: '13px',
+                lineHeight: '1.5',
+                padding: '0',
+                margin: '0',
+              },
+            });
+            resultContent.appendChild(pre);
+          }
+        } else {
+          // Original object handling for backward compatibility
+          rawResultText = JSON.stringify(result, null, 2);
+          const pre = createOptimizedElement('pre', {
+            textContent: rawResultText,
+            styles: {
+              fontFamily: 'inherit',
+              fontSize: '13px',
+              lineHeight: '1.5',
+              padding: '0',
+              margin: '0',
+            },
+          });
+          resultContent.appendChild(pre);
+        }
       } catch (e) {
         rawResultText = String(result);
         resultContent.textContent = rawResultText;
@@ -1332,7 +1433,7 @@ export const displayResult = (
         };
 
         setErrorState();
-        console.error('No adapter available for text insertion.');
+        logger.error('No adapter available for text insertion.');
         return;
       }
 
@@ -1348,7 +1449,7 @@ export const displayResult = (
         };
 
         setErrorState();
-        console.error('Current adapter does not support text insertion.');
+        logger.error('Current adapter does not support text insertion.');
         return;
       }
 
@@ -1356,7 +1457,7 @@ export const displayResult = (
 
       // Check result length and handle accordingly
       if (rawResultText.length > MAX_INSERT_LENGTH && WEBSITE_NAME_FOR_MAX_INSERT_LENGTH_CHECK.includes(websiteName)) {
-        console.debug(`Result length (${wrapperText.length}) exceeds ${MAX_INSERT_LENGTH}. Attaching as file.`);
+        logger.debug(`Result length (${wrapperText.length}) exceeds ${MAX_INSERT_LENGTH}. Attaching as file.`);
         await attachResultAsFile(
           adapter,
           functionName,
@@ -1401,11 +1502,11 @@ export const displayResult = (
               throw new Error('Adapter insertText method returned false');
             }
           } catch (error) {
-            console.error('New adapter insertText method failed:', error);
+            logger.error('New adapter insertText method failed:', error);
             
             // Fallback to legacy method if available
             if (typeof adapter.insertTextIntoInput === 'function') {
-              console.debug('Falling back to legacy insertTextIntoInput method');
+              logger.debug('Falling back to legacy insertTextIntoInput method');
               
               // Efficient event dispatch with requestAnimationFrame
               requestAnimationFrame(() => {
@@ -1433,7 +1534,7 @@ export const displayResult = (
               }, 2000);
             } else {
               // Optimized error state
-              console.error('No valid insert method found on adapter');
+              logger.error('No valid insert method found on adapter');
               insertButton.textContent = 'Failed (No Insert Method)';
               insertButton.classList.add('insert-error');
 
@@ -1445,7 +1546,7 @@ export const displayResult = (
           }
         } else if (typeof adapter.insertTextIntoInput === 'function') {
           // Legacy method fallback
-          console.debug('Using legacy insertTextIntoInput method');
+          logger.debug('Using legacy insertTextIntoInput method');
           
           // Efficient event dispatch with requestAnimationFrame
           requestAnimationFrame(() => {
@@ -1473,7 +1574,7 @@ export const displayResult = (
           }, 2000);
         } else {
           // Optimized error state
-          console.error('Adapter has no insert method available');
+          logger.error('Adapter has no insert method available');
           insertButton.textContent = 'Failed (No Insert Method)';
           insertButton.classList.add('insert-error');
 
@@ -1533,7 +1634,7 @@ export const displayResult = (
       adapter && adapterSupportsCapability('file-attachment') &&
       WEBSITE_NAME_FOR_MAX_INSERT_LENGTH_CHECK.includes(websiteName)
     ) {
-      console.debug(`Auto-attaching file: Result length (${rawResultText.length}) exceeds ${MAX_INSERT_LENGTH}`);
+      logger.debug(`Auto-attaching file: Result length (${rawResultText.length}) exceeds ${MAX_INSERT_LENGTH}`);
 
       // Create efficient fake button for auto-attachment
       const fakeElements = {
@@ -1546,15 +1647,15 @@ export const displayResult = (
       attachResultAsFile(adapter, functionName, callId, rawResultText, fakeElements.button, null, true) // Set to true to prevent double attachment
         .then(async ({ success, message }) => {
           if (success && message) {
-            console.debug(`Auto-attached file successfully: ${message}`);
+            logger.debug(`Auto-attached file successfully: ${message}`);
             
             // Insert the auto-attachment confirmation text
             if (typeof adapter.insertText === 'function') {
               try {
                 await adapter.insertText(message);
-                console.debug('Auto-attachment confirmation text inserted successfully');
+                logger.debug('Auto-attachment confirmation text inserted successfully');
               } catch (insertError) {
-                console.warn('Failed to insert auto-attachment confirmation text:', insertError);
+                logger.warn('Failed to insert auto-attachment confirmation text:', insertError);
                 // Fallback to legacy method if available
                 if (typeof adapter.insertTextIntoInput === 'function') {
                   try {
@@ -1572,7 +1673,7 @@ export const displayResult = (
                       );
                     });
                   } catch (legacyError) {
-                    console.warn('Legacy insertion for auto-attachment also failed:', legacyError);
+                    logger.warn('Legacy insertion for auto-attachment also failed:', legacyError);
                   }
                 }
               }
@@ -1592,11 +1693,11 @@ export const displayResult = (
                   );
                 });
               } catch (legacyError) {
-                console.warn('Legacy insertion for auto-attachment failed:', legacyError);
+                logger.warn('Legacy insertion for auto-attachment failed:', legacyError);
               }
             }
           } else {
-            console.error('Failed to auto-attach file.');
+            logger.error('Failed to auto-attach file.');
             // Fallback to manual attach button
             setTimeout(() => attachButton.click(), 100);
           }
@@ -1605,7 +1706,7 @@ export const displayResult = (
           ElementPool.release(fakeElements.button);
         })
         .catch(err => {
-          console.error('Error auto-attaching file:', err);
+          logger.error('Error auto-attaching file:', err);
           ElementPool.release(fakeElements.button);
         });
     } else {

@@ -5,6 +5,10 @@ import { useCurrentAdapter, useUserPreferences, useMCPState } from '../../hooks'
 import PopoverPortal from './PopoverPortal';
 import { instructionsState } from '../sidebar/Instructions/InstructionManager';
 import { AutomationService } from '../../services/automation.service';
+import { createLogger } from '@extension/shared/lib/logger';
+
+
+const logger = createLogger('mcpPopover');
 
 export interface MCPToggleState {
   mcpEnabled: boolean;
@@ -437,9 +441,9 @@ input:checked + .mcp-toggle-slider:before {
   z-index: 2147483647 !important;
   white-space: nowrap !important;
   pointer-events: none !important;
-  width: 130px !important;
-  min-width: 130px !important;
-  max-width: 130px !important;
+  width: 150px !important;
+  min-width: 150px !important;
+  max-width: 150px !important;
   box-sizing: border-box !important;
   font-family: inherit !important;
   font-synthesis: none !important;
@@ -631,7 +635,7 @@ export const MCPPopover: React.FC<MCPPopoverProps> = ({ toggleStateManager, adap
 
   // Debug: Log adapter state changes
   useEffect(() => {
-    console.debug(`[MCPPopover] Adapter state changed:`, {
+    logger.debug(`Adapter state changed:`, {
       isAdapterActive,
       hasActivePlugin: !!activePlugin,
       pluginName: activePlugin?.name,
@@ -645,7 +649,7 @@ export const MCPPopover: React.FC<MCPPopoverProps> = ({ toggleStateManager, adap
 
   // Debug: Log instructions state for debugging
   useEffect(() => {
-    console.debug(`[MCPPopover] Instructions state:`, {
+    logger.debug(`Instructions state:`, {
       hasInstructions: !!instructionsState.instructions,
       instructionsLength: instructionsState.instructions.length,
       preferences: preferences
@@ -696,6 +700,7 @@ export const MCPPopover: React.FC<MCPPopoverProps> = ({ toggleStateManager, adap
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [isHoverOverlayVisible, setIsHoverOverlayVisible] = useState(false);
   const [hoverOverlayPosition, setHoverOverlayPosition] = useState({ x: 0, y: 0 });
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true); // Track sidebar visibility
   const popoverRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -712,13 +717,13 @@ export const MCPPopover: React.FC<MCPPopoverProps> = ({ toggleStateManager, adap
 
   // Sync state when MCP state changes from store (e.g., from other UI components or on page load)
   useEffect(() => {
-    console.debug(`[MCPPopover] MCP state changed to: ${mcpEnabledFromStore}, updating MCP toggle UI`);
+    logger.debug(`MCP state changed to: ${mcpEnabledFromStore}, updating MCP toggle UI`);
     setState(prevState => {
       const newState = {
         ...prevState,
         mcpEnabled: mcpEnabledFromStore
       };
-      console.debug(`[MCPPopover] State updated:`, newState);
+      logger.debug(`State updated:`, newState);
       return newState;
     });
   }, [mcpEnabledFromStore]);
@@ -743,8 +748,8 @@ export const MCPPopover: React.FC<MCPPopoverProps> = ({ toggleStateManager, adap
   useEffect(() => {
     // Force initial state sync to ensure popover reflects current persistent MCP state
     const currentToggleState = toggleStateManager.getState();
-    console.debug(`[MCPPopover] Initial state sync - toggleManager: ${currentToggleState.mcpEnabled}, store MCP: ${mcpEnabledFromStore}`);
-    
+    logger.debug(`Initial state sync - toggleManager: ${currentToggleState.mcpEnabled}, store MCP: ${mcpEnabledFromStore}`);
+
     // Sync automation state from user preferences
     const syncedState = {
       ...currentToggleState,
@@ -753,18 +758,47 @@ export const MCPPopover: React.FC<MCPPopoverProps> = ({ toggleStateManager, adap
       autoSubmit: preferences.autoSubmit || false,
       autoExecute: preferences.autoExecute || false,
     };
-    
+
     setState(syncedState);
-    
+
     // Also sync the legacy toggle state manager
     toggleStateManager.setAutoInsert(preferences.autoInsert || false);
     toggleStateManager.setAutoSubmit(preferences.autoSubmit || false);
     toggleStateManager.setAutoExecute(preferences.autoExecute || false);
   }, [toggleStateManager, mcpEnabledFromStore, preferences.autoInsert, preferences.autoSubmit, preferences.autoExecute]); // Include dependencies
 
+  // Track sidebar visibility from window.activeSidebarManager and Zustand store
+  useEffect(() => {
+    // Listen for sidebar visibility changes via custom events
+    const handleSidebarVisibilityChange = (event: CustomEvent) => {
+      const { visible } = event.detail;
+      logger.debug(`Sidebar visibility changed to: ${visible}`);
+      setIsSidebarVisible(visible);
+    };
+
+    window.addEventListener('ui:sidebar-toggle' as any, handleSidebarVisibilityChange);
+
+    // Also check activeSidebarManager if available
+    const checkSidebarVisibility = () => {
+      const manager = (window as any).activeSidebarManager;
+      if (manager && manager._isVisible !== undefined) {
+        setIsSidebarVisible(manager._isVisible);
+      }
+    };
+
+    // Check initially and periodically
+    checkSidebarVisibility();
+    const intervalId = setInterval(checkSidebarVisibility, 1000);
+
+    return () => {
+      window.removeEventListener('ui:sidebar-toggle' as any, handleSidebarVisibilityChange);
+      clearInterval(intervalId);
+    };
+  }, []);
+
   // Handlers for toggles
   const handleMCP = (checked: boolean) => {
-    console.debug(`[MCPPopover] MCP toggle changed to: ${checked}`);
+    logger.debug(`MCP toggle changed to: ${checked}`);
     
     // Update the persistent MCP state in store (this will automatically control sidebar visibility)
     setMCPEnabled(checked, 'mcp-popover-user-toggle');
@@ -776,7 +810,7 @@ export const MCPPopover: React.FC<MCPPopoverProps> = ({ toggleStateManager, adap
   };
 
   const handleAutoInsert = (checked: boolean) => {
-    console.debug(`[MCPPopover] Auto Insert toggle changed to: ${checked}`);
+    logger.debug(`Auto Insert toggle changed to: ${checked}`);
     
     // Update user preferences store
     updatePreferences({ autoInsert: checked });
@@ -790,7 +824,7 @@ export const MCPPopover: React.FC<MCPPopoverProps> = ({ toggleStateManager, adap
   };
 
   const handleAutoSubmit = (checked: boolean) => {
-    console.debug(`[MCPPopover] Auto Submit toggle changed to: ${checked}`);
+    logger.debug(`Auto Submit toggle changed to: ${checked}`);
     
     // Update user preferences store
     updatePreferences({ autoSubmit: checked });
@@ -804,7 +838,7 @@ export const MCPPopover: React.FC<MCPPopoverProps> = ({ toggleStateManager, adap
   };
 
   const handleAutoExecute = (checked: boolean) => {
-    console.debug(`[MCPPopover] Auto Execute toggle changed to: ${checked}`);
+    logger.debug(`Auto Execute toggle changed to: ${checked}`);
     
     // Update user preferences store
     updatePreferences({ autoExecute: checked });
@@ -838,9 +872,9 @@ export const MCPPopover: React.FC<MCPPopoverProps> = ({ toggleStateManager, adap
     }
 
     // Add more detailed debugging
-    console.debug(`[MCPPopover] handleInsert called - isAdapterActive: ${isAdapterActive}, activePlugin: ${!!activePlugin}, insertText: ${!!insertText}`);
+    logger.debug(`handleInsert called - isAdapterActive: ${isAdapterActive}, activePlugin: ${!!activePlugin}, insertText: ${!!insertText}`);
     if (activePlugin) {
-      console.debug(`[MCPPopover] Active plugin details:`, {
+      logger.debug(`Active plugin details:`, {
         name: activePlugin.name,
         capabilities: activePlugin.capabilities,
         hasInsertText: !!activePlugin.insertText
@@ -849,30 +883,30 @@ export const MCPPopover: React.FC<MCPPopoverProps> = ({ toggleStateManager, adap
 
     // Try with a small delay first to allow state to propagate
     if (!isAdapterActive || !activePlugin || !insertText) {
-      console.debug(`[MCPPopover] Adapter not immediately ready, waiting 100ms and retrying...`);
+      logger.debug(`Adapter not immediately ready, waiting 100ms and retrying...`);
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     if (isAdapterActive && activePlugin && insertText) {
       try {
-        console.debug(`[MCPPopover] Attempting to insert text using ${activePlugin.name} adapter`);
+        logger.debug(`Attempting to insert text using ${activePlugin.name} adapter`);
         const success = await insertText(instructions);
         if (success) {
           setInsertStatus('Inserted!');
-          console.debug(`[MCPPopover] Text inserted successfully using ${activePlugin.name} adapter`);
+          logger.debug(`Text inserted successfully using ${activePlugin.name} adapter`);
         } else {
           setInsertStatus('Failed');
-          console.warn(`[MCPPopover] Text insertion failed using ${activePlugin.name} adapter`);
+          logger.warn(`Text insertion failed using ${activePlugin.name} adapter`);
         }
       } catch (error) {
-        console.error(`[MCPPopover] Error inserting text:`, error);
+        logger.error(`Error inserting text:`, error);
         setInsertStatus('Failed');
       }
     } else {
       setInsertStatus('No Adapter');
-      console.warn(`[MCPPopover] No active adapter available for text insertion. isAdapterActive: ${isAdapterActive}, activePlugin: ${!!activePlugin}, insertText: ${!!insertText}`);
+      logger.warn(`No active adapter available for text insertion. isAdapterActive: ${isAdapterActive}, activePlugin: ${!!activePlugin}, insertText: ${!!insertText}`);
       if (activePlugin) {
-        console.warn(`[MCPPopover] Active plugin details:`, {
+        logger.warn(`Active plugin details:`, {
           name: activePlugin.name,
           capabilities: activePlugin.capabilities,
           hasInsertTextMethod: !!activePlugin.insertText
@@ -883,11 +917,40 @@ export const MCPPopover: React.FC<MCPPopoverProps> = ({ toggleStateManager, adap
   };
 
 
+  const handleToggleSidebar = async () => {
+    logger.debug(`Toggle sidebar requested. Current state: ${isSidebarVisible}`);
+
+    try {
+      const manager = (window as any).activeSidebarManager;
+
+      if (manager) {
+        if (isSidebarVisible) {
+          logger.debug('[MCPPopover] Hiding sidebar via activeSidebarManager');
+          await manager.hide();
+        } else {
+          logger.debug('[MCPPopover] Showing sidebar via activeSidebarManager');
+          await manager.show();
+        }
+      } else {
+        logger.warn('[MCPPopover] activeSidebarManager not available, using fallback');
+        // Fallback: Use Zustand store directly
+        const { useUIStore } = await import('../../stores/ui.store');
+        const store = useUIStore.getState();
+        store.setSidebarVisibility(!isSidebarVisible, 'mcp-popover-toggle');
+      }
+
+      // Update local state immediately for responsive UI
+      setIsSidebarVisible(!isSidebarVisible);
+    } catch (error) {
+      logger.error('[MCPPopover] Error toggling sidebar:', error);
+    }
+  };
+
   const handleAttach = async () => {
     // Add more detailed debugging
-    console.debug(`[MCPPopover] handleAttach called - isAdapterActive: ${isAdapterActive}, activePlugin: ${!!activePlugin}, attachFile: ${!!attachFile}`);
+    logger.debug(`handleAttach called - isAdapterActive: ${isAdapterActive}, activePlugin: ${!!activePlugin}, attachFile: ${!!attachFile}`);
     if (activePlugin) {
-      console.debug(`[MCPPopover] Active plugin details for attach:`, {
+      logger.debug(`Active plugin details for attach:`, {
         name: activePlugin.name,
         capabilities: activePlugin.capabilities,
         hasAttachFile: !!activePlugin.attachFile,
@@ -903,42 +966,42 @@ export const MCPPopover: React.FC<MCPPopoverProps> = ({ toggleStateManager, adap
 
     // Try with a small delay first to allow state to propagate
     if (!isAdapterActive || !activePlugin || !attachFile) {
-      console.debug(`[MCPPopover] Adapter not immediately ready for attachment, waiting 100ms and retrying...`);
+      logger.debug(`Adapter not immediately ready for attachment, waiting 100ms and retrying...`);
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     if (isAdapterActive && activePlugin && attachFile) {
       if (!activePlugin.capabilities.includes('file-attachment')) {
       setAttachStatus('Not Supported');
-      console.warn(`[MCPPopover] File attachment not supported by ${activePlugin.name} adapter`);
+      logger.warn(`File attachment not supported by ${activePlugin.name} adapter`);
       return;
       }
 
       const isPerplexity = activePlugin.name === 'Perplexity';
       const isGemini = activePlugin.name === 'Gemini';
-      const fileType = isPerplexity || isGemini ? 'text/plain' : 'text/markdown';
-      const fileExtension = isPerplexity || isGemini ? '.txt' : '.md';
+      let fileType = isPerplexity || isGemini ? 'text/plain' : 'text/markdown';
+      const fileExtension = fileType === 'text/plain' ? '.txt' : '.md';
       const fileName = `mcp_superassistant_instructions${fileExtension}`;
       const file = new File([instructions], fileName, { type: fileType });
       try {
-      console.debug(`[MCPPopover] Attempting to attach file using ${activePlugin.name} adapter`);
+      logger.debug(`Attempting to attach file using ${activePlugin.name} adapter`);
       const success = await attachFile(file);
       if (success) {
         setAttachStatus('Attached!');
-        console.debug(`[MCPPopover] File attached successfully using ${activePlugin.name} adapter`);
+        logger.debug(`File attached successfully using ${activePlugin.name} adapter`);
       } else {
         setAttachStatus('Error');
-        console.warn(`[MCPPopover] File attachment failed using ${activePlugin.name} adapter`);
+        logger.warn(`File attachment failed using ${activePlugin.name} adapter`);
       }
       } catch (error) {
-      console.error(`[MCPPopover] Error attaching file:`, error);
+      logger.error(`Error attaching file:`, error);
       setAttachStatus('Error');
       }
     } else {
       setAttachStatus('No File');
-      console.warn(`[MCPPopover] Cannot attach file. isAdapterActive: ${isAdapterActive}, activePlugin: ${!!activePlugin}, attachFile: ${!!attachFile}`);
+      logger.warn(`Cannot attach file. isAdapterActive: ${isAdapterActive}, activePlugin: ${!!activePlugin}, attachFile: ${!!attachFile}`);
       if (activePlugin) {
-      console.warn(`[MCPPopover] Active plugin details:`, {
+      logger.warn(`Active plugin details:`, {
         name: activePlugin.name,
         capabilities: activePlugin.capabilities,
         hasAttachFileMethod: !!activePlugin.attachFile
@@ -952,16 +1015,15 @@ export const MCPPopover: React.FC<MCPPopoverProps> = ({ toggleStateManager, adap
   const updateHoverOverlayPosition = useCallback(() => {
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      const overlayWidth = 130; // fixed width from CSS
-      const overlayHeight = 140; // approximate height for 3 buttons
-      
+      const overlayWidth = 150; // fixed width from CSS (updated for 4 buttons)
+      const overlayHeight = 180; // approximate height for 4 buttons
+
       // Calculate position above the button
       let x = rect.right - overlayWidth + 10; // Align to right edge with some offset
       let y = rect.top - overlayHeight - 10; // Position above with gap
-      
+
       // Keep within viewport bounds
       const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
       
       // Adjust horizontal position if going off screen
       if (x < 10) {
@@ -1143,6 +1205,23 @@ export const MCPPopover: React.FC<MCPPopoverProps> = ({ toggleStateManager, adap
               <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/>
             </svg>
             Attach
+          </button>
+          <button
+            className="mcp-hover-button"
+            onClick={handleToggleSidebar}
+            title={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
+            type="button"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
+              {isSidebarVisible ? (
+                // Eye-off icon (hide)
+                <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
+              ) : (
+                // Eye icon (show)
+                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+              )}
+            </svg>
+            {isSidebarVisible ? 'Hide Sidebar' : 'Show Sidebar'}
           </button>
           <button
             className="mcp-hover-button"

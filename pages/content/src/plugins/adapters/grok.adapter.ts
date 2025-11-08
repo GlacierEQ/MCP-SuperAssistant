@@ -1,5 +1,6 @@
 import { BaseAdapterPlugin } from './base.adapter';
 import type { AdapterCapability, PluginContext } from '../plugin-types';
+import { createLogger } from '@extension/shared/lib/logger';
 
 /**
  * Grok Adapter for X.com/Grok (x.com, grok.com)
@@ -10,6 +11,9 @@ import type { AdapterCapability, PluginContext } from '../plugin-types';
  * Migrated from the legacy adapter system to the new plugin architecture.
  * Maintains compatibility with existing functionality while integrating with Zustand stores.
  */
+
+const logger = createLogger('GrokAdapter');
+
 export class GrokAdapter extends BaseAdapterPlugin {
   readonly name = 'GrokAdapter';
   readonly version = '2.0.0'; // Incremented for new architecture
@@ -68,7 +72,7 @@ export class GrokAdapter extends BaseAdapterPlugin {
     super();
     GrokAdapter.instanceCount++;
     this.instanceId = GrokAdapter.instanceCount;
-    console.debug(`[GrokAdapter] Instance #${this.instanceId} created. Total instances: ${GrokAdapter.instanceCount}`);
+    logger.debug(`Instance #${this.instanceId} created. Total instances: ${GrokAdapter.instanceCount}`);
   }
 
   async initialize(context: PluginContext): Promise<void> {
@@ -675,9 +679,9 @@ export class GrokAdapter extends BaseAdapterPlugin {
         margin-left: 4px;
       }
 
-      /* Ensure proper stacking context */
+      /* Ensure proper stacking context - higher than Grok's z-20 elements */
       .mcp-grok-button-base {
-        z-index: 1;
+        z-index: 25;
       }
 
       /* Match Grok's button focus ring exactly */

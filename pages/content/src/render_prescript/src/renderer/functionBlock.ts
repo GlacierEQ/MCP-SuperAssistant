@@ -11,8 +11,13 @@ import {
 import { applyThemeClass } from '../utils/themeDetector';
 import { getPreviousExecution, getPreviousExecutionLegacy, generateContentSignature } from '../mcpexecute/storage';
 import type { ParamValueElement } from '../core/types';
+import { extractJSONFunctionInfo, extractJSONParameters } from '../parser/jsonFunctionParser';
+import { createLogger } from '@extension/shared/lib/logger';
 
 // Define custom property for tracking scroll state
+
+const logger = createLogger('FunctionBlockRenderer');
+
 declare global {
   interface HTMLElement {
     _userHasScrolled?: boolean;
@@ -439,12 +444,12 @@ const configureMonacoEditorForCSP = (): void => {
 
       (window as any).MonacoEnvironment = {
         getWorkerUrl: () =>
-          'data:text/javascript;charset=utf-8,console.debug("Monaco worker disabled for CSP compatibility");',
+          'data:text/javascript;charset=utf-8,logger.debug("Monaco worker disabled for CSP compatibility");',
       };
 
-      console.debug('Monaco editor configured for CSP compatibility');
+      logger.debug('Monaco editor configured for CSP compatibility');
     } catch (e) {
-      console.error('Failed to configure Monaco editor for CSP:', e);
+      logger.error('Failed to configure Monaco editor for CSP:', e);
     }
   }
 };
@@ -531,7 +536,6 @@ const injectStreamingStyles = (() => {
         transform: translate3d(0, 0, 0);
         backface-visibility: hidden;
         contain: layout style;
-        margin-left: 8px;
       }
       
       .function-block.theme-dark .spinner {
@@ -573,8 +577,7 @@ export const executionTracker: ExecutionTracker = {
   executedFunctions: new Set<string>(),
 
   isFunctionExecuted(callId: string, contentSignature: string, functionName?: string): boolean {
-    console.debug(
-      `[Debug] isFunctionExecuted called with: callId='${callId}', signature='${contentSignature}', funcName='${functionName || 'undefined'}'`,
+    logger.debug(`isFunctionExecuted called with: callId='${callId}', signature='${contentSignature}', funcName='${functionName || 'undefined'}'`,
     );
 
     let effectiveFunctionName = functionName;
@@ -590,7 +593,7 @@ export const executionTracker: ExecutionTracker = {
       }
       if (functionNameFromMemory) {
         effectiveFunctionName = functionNameFromMemory;
-        console.debug(`[Debug] Found functionName='${effectiveFunctionName}' from executedFunctions set`);
+        logger.debug(`Found functionName='${effectiveFunctionName}' from executedFunctions set`);
       }
     }
 
@@ -598,16 +601,14 @@ export const executionTracker: ExecutionTracker = {
       const key = `${effectiveFunctionName}:${callId}:${contentSignature}`;
       const inMemory = this.executedFunctions.has(key);
       const inStorage = getPreviousExecution(effectiveFunctionName, callId, contentSignature) !== null;
-      console.debug(
-        `[Debug] isFunctionExecuted (Standard Check): Key='${key}', inMemory=${inMemory}, inStorage=${inStorage}`,
+      logger.debug(`isFunctionExecuted (Standard Check): Key='${key}', inMemory=${inMemory}, inStorage=${inStorage}`,
       );
       return inMemory || inStorage;
     } else {
       const key = `${callId}:${contentSignature}`;
       const inMemory = this.executedFunctions.has(key) || this.executedFunctions.has(`:${callId}:${contentSignature}`);
       const inStorage = getPreviousExecutionLegacy(callId, contentSignature) !== null;
-      console.debug(
-        `[Debug] isFunctionExecuted (Legacy Check): Key='${key}', inMemory=${inMemory}, inStorage=${inStorage}`,
+      logger.debug(`isFunctionExecuted (Legacy Check): Key='${key}', inMemory=${inMemory}, inStorage=${inStorage}`,
       );
       return inMemory || inStorage;
     }
@@ -775,14 +776,25 @@ const BlockElementUtils = {
     const functionNameElement = DOMUtils.createElement<HTMLDivElement>('div', 'function-name');
 
     const leftSection = DOMUtils.createElement<HTMLDivElement>('div', 'function-name-left');
+
+    // Create a container for function name and spinner (inline)
+    const functionNameRow = DOMUtils.createElement<HTMLDivElement>('div', 'function-name-row');
+    DOMUtils.applyStyles(functionNameRow, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+    });
+
     const functionNameText = DOMUtils.createElement<HTMLSpanElement>('span', 'function-name-text');
     functionNameText.textContent = functionName;
-    leftSection.appendChild(functionNameText);
+    functionNameRow.appendChild(functionNameText);
 
     if (!isComplete && !isPreExistingIncomplete) {
       const spinner = DOMUtils.createElement<HTMLDivElement>('div', 'spinner');
-      leftSection.appendChild(spinner);
+      functionNameRow.appendChild(spinner);
     }
+
+    leftSection.appendChild(functionNameRow);
 
     const rightSection = DOMUtils.createElement<HTMLDivElement>('div', 'function-name-right');
 
@@ -826,7 +838,7 @@ const BlockElementUtils = {
     expandButton: HTMLButtonElement,
     expandableContent: HTMLDivElement,
   ): void => {
-    expandButton.onclick = e => {
+    const toggleExpandCollapse = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
 
@@ -893,6 +905,18 @@ const BlockElementUtils = {
         });
       }
     };
+
+    // Attach click handler to expand button
+    expandButton.onclick = toggleExpandCollapse;
+
+    // Make entire function-name area clickable
+    const functionNameElement = blockDiv.querySelector('.function-name') as HTMLDivElement;
+    if (functionNameElement) {
+      DOMUtils.applyStyles(functionNameElement, {
+        cursor: 'pointer',
+      });
+      functionNameElement.onclick = toggleExpandCollapse;
+    }
   },
 };
 
@@ -1046,18 +1070,18 @@ const AutoExecutionUtils = {
       const attempts = executionTracker.incrementAttempts(blockId);
 
       if (attempts > MAX_AUTO_EXECUTE_ATTEMPTS) {
-        console.debug(`Auto-execute: Giving up on block ${blockId} after ${attempts - 1} attempts`);
+        logger.debug(`Auto-execute: Giving up on block ${blockId} after ${attempts - 1} attempts`);
         executionTracker.cleanupBlock(blockId);
         return;
       }
 
-      console.debug(`Auto-execute attempt ${attempts}/${MAX_AUTO_EXECUTE_ATTEMPTS} for block ${blockId}`);
+      logger.debug(`Auto-execute attempt ${attempts}/${MAX_AUTO_EXECUTE_ATTEMPTS} for block ${blockId}`);
 
       // Get auto execute delay from window state
       const automationState = (window as any).__mcpAutomationState;
       const autoExecuteDelay = (automationState?.autoExecuteDelay || 0) * 1000; // Convert to milliseconds
 
-      console.debug(`[AutoExecution] Using delay of ${autoExecuteDelay}ms for block ${blockId}`);
+      logger.debug(`Using delay of ${autoExecuteDelay}ms for block ${blockId}`);
 
       PerformanceUtils.setManagedTimeout(
         `auto-exec-${blockId}-${attempts}`,
@@ -1065,18 +1089,18 @@ const AutoExecutionUtils = {
           let currentBlock = document.querySelector<HTMLDivElement>(`.function-block[data-block-id="${blockId}"]`);
 
           if (!currentBlock) {
-            console.debug(`Auto-execute: Original block ${blockId} not found. Searching for replacement...`);
+            logger.debug(`Auto-execute: Original block ${blockId} not found. Searching for replacement...`);
             currentBlock = AutoExecutionUtils.findReplacementBlock(functionDetails);
           }
 
           if (!currentBlock) {
-            console.debug(
+            logger.debug(
               `Auto-execute: Block ${blockId} not found (attempt ${attempts}/${MAX_AUTO_EXECUTE_ATTEMPTS})`,
             );
             if (attempts < MAX_AUTO_EXECUTE_ATTEMPTS) {
               setupAutoExecution();
             } else {
-              console.debug(`Auto-execute: Giving up on block ${blockId} - not found in DOM`);
+              logger.debug(`Auto-execute: Giving up on block ${blockId} - not found in DOM`);
               executionTracker.cleanupBlock(blockId);
             }
             return;
@@ -1088,22 +1112,22 @@ const AutoExecutionUtils = {
             functionDetails.contentSignature,
           );
           if (finalCheckExecuted) {
-            console.debug(`Auto-execute: Function already executed, skipping.`);
+            logger.debug(`Auto-execute: Function already executed, skipping.`);
             executionTracker.cleanupBlock(blockId);
             return;
           }
 
           const executeButton = currentBlock.querySelector<HTMLButtonElement>('.execute-button');
           if (executeButton) {
-            console.debug(`Auto-execute: Executing function ${functionDetails.functionName}`);
+            logger.debug(`Auto-execute: Executing function ${functionDetails.functionName}`);
             executeButton.click();
             executionTracker.cleanupBlock(blockId);
           } else {
-            console.debug(`Auto-execute: Execute button not found (attempt ${attempts}/${MAX_AUTO_EXECUTE_ATTEMPTS})`);
+            logger.debug(`Auto-execute: Execute button not found (attempt ${attempts}/${MAX_AUTO_EXECUTE_ATTEMPTS})`);
             if (attempts < MAX_AUTO_EXECUTE_ATTEMPTS) {
               setupAutoExecution();
             } else {
-              console.debug(`Auto-execute: Giving up on block ${blockId} - button not found`);
+              logger.debug(`Auto-execute: Giving up on block ${blockId} - button not found`);
               executionTracker.cleanupBlock(blockId);
             }
           }
@@ -1132,7 +1156,7 @@ const AutoExecutionUtils = {
         );
 
         if (!alreadyExecuted) {
-          console.debug(`Auto-execute: Found replacement block, attempting execution.`);
+          logger.debug(`Auto-execute: Found replacement block, attempting execution.`);
           return block;
         }
       }
@@ -1154,13 +1178,36 @@ export const renderFunctionCall = (block: HTMLPreElement, isProcessingRef: { cur
 
   const functionInfo = containsFunctionCalls(block);
 
+  if (CONFIG.debug) {
+    logger.debug('[Render] containsFunctionCalls result:', {
+      hasFunctionCalls: functionInfo.hasFunctionCalls,
+      detectedBlockType: functionInfo.detectedBlockType,
+      isComplete: functionInfo.isComplete,
+      hasParameters: functionInfo.hasParameters,
+      invokeName: functionInfo.invokeName
+    });
+  }
+
   // Early exit checks
   if (!functionInfo.hasFunctionCalls || block.closest('.function-block')) {
+    if (CONFIG.debug && !functionInfo.hasFunctionCalls) {
+      const textContent = block.textContent?.trim() || '';
+      if (textContent.length === 0) {
+        logger.debug('[Render] Skipping empty block - waiting for content');
+      } else if (textContent.length < 10) {
+        logger.debug('[Render] Skipping very short content - waiting for more data');
+      } else {
+        logger.debug('[Render] Early exit - no function calls detected');
+      }
+    }
     return false;
   }
 
   const textContent = block.textContent?.trim() || '';
   if (textContent.length < 10) {
+    if (CONFIG.debug) {
+      logger.debug('[Render] Skipping block with insufficient content (length:', textContent.length, ')');
+    }
     return false;
   }
 
@@ -1169,13 +1216,13 @@ export const renderFunctionCall = (block: HTMLPreElement, isProcessingRef: { cur
 
   // Skip if resyncing or already complete and stable
   if ((window as any).resyncingBlocks?.has(blockId)) {
-    if (CONFIG.debug) console.debug(`Skipping render for resyncing block ${blockId}`);
+    if (CONFIG.debug) logger.debug(`Skipping render for resyncing block ${blockId}`);
     return false;
   }
 
   const existingFunctionBlock = document.querySelector(`.function-block[data-block-id="${blockId}"]`);
   if (existingFunctionBlock && existingFunctionBlock.classList.contains('function-complete')) {
-    if (CONFIG.debug) console.debug(`Skipping render for completed block ${blockId}`);
+    if (CONFIG.debug) logger.debug(`Skipping render for completed block ${blockId}`);
     return false;
   }
 
@@ -1205,12 +1252,33 @@ export const renderFunctionCall = (block: HTMLPreElement, isProcessingRef: { cur
       block.setAttribute('data-block-id', blockId);
     }
   } else {
-    previousCompletionStatus = !existingDiv.classList.contains('function-loading');
+    // Check if block was previously complete (has function-complete class)
+    // Once complete, it should stay complete to prevent flickering
+    previousCompletionStatus = existingDiv.classList.contains('function-complete');
   }
 
   const rawContent = block.textContent?.trim() || '';
   const { tag, content } = extractLanguageTag(rawContent);
-  const { functionName, callId, parameters: partialParameters } = CacheUtils.parseContentEfficiently(block, rawContent);
+
+  // Determine if JSON or XML format
+  const isJSONFormat = functionInfo.detectedBlockType === 'json';
+  let functionName: string;
+  let callId: string;
+  let partialParameters: Record<string, string>;
+  let description: string | null = null;
+
+  if (isJSONFormat) {
+    const jsonInfo = extractJSONFunctionInfo(rawContent);
+    functionName = jsonInfo.functionName || 'function';
+    callId = jsonInfo.callId || `block-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    description = jsonInfo.description;
+    partialParameters = extractJSONParameters(rawContent);
+  } else {
+    const parsed = CacheUtils.parseContentEfficiently(block, rawContent);
+    functionName = parsed.functionName;
+    callId = parsed.callId;
+    partialParameters = parsed.parameters;
+  }
 
   const blockDiv = existingDiv || DOMUtils.createElement<HTMLDivElement>('div');
 
@@ -1228,6 +1296,8 @@ export const renderFunctionCall = (block: HTMLPreElement, isProcessingRef: { cur
   // Handle state transitions
   if (!isNewRender) {
     const justCompleted = previousCompletionStatus === false && functionInfo.isComplete;
+    // Prevent flickering: once a block is complete, don't allow it to become incomplete
+    // This prevents re-rendering loops caused by temporary parsing issues
     const justBecameIncomplete = previousCompletionStatus === true && !functionInfo.isComplete;
 
     if (justCompleted) {
@@ -1235,7 +1305,9 @@ export const renderFunctionCall = (block: HTMLPreElement, isProcessingRef: { cur
       blockDiv.classList.add('function-complete');
       const spinner = blockDiv.querySelector('.spinner');
       if (spinner) spinner.remove();
-    } else if (justBecameIncomplete) {
+    } else if (justBecameIncomplete && !blockDiv.classList.contains('function-complete')) {
+      // Only transition to incomplete if the block wasn't already marked as complete
+      // This prevents flickering from temporary state changes
       blockDiv.classList.remove('function-complete');
       blockDiv.classList.add('function-loading');
     }
@@ -1316,6 +1388,34 @@ export const renderFunctionCall = (block: HTMLPreElement, isProcessingRef: { cur
     BlockElementUtils.setupExpandCollapse(blockDiv, expandButton, expandableContent);
   }
 
+  // Add description section if present (JSON format)
+  // Insert it inside the function-name-left section, below the function name
+  if (description && functionNameElement) {
+    const leftSection = functionNameElement.querySelector('.function-name-left') as HTMLDivElement;
+    if (leftSection && !leftSection.querySelector('.function-description')) {
+      // Change flex direction to column to stack elements vertically
+      DOMUtils.applyStyles(leftSection, {
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+      });
+
+      const descriptionElement = DOMUtils.createElement<HTMLDivElement>('div', 'function-description');
+      descriptionElement.textContent = description;
+      DOMUtils.applyStyles(descriptionElement, {
+        fontSize: '12px',
+        color: 'inherit',
+        marginTop: '4px',
+        fontStyle: 'bold',
+        lineHeight: '1.4',
+        display: 'block',
+        opacity: '0.8',
+      });
+
+      // Append description to the left section (below function name)
+      leftSection.appendChild(descriptionElement);
+    }
+  }
+
   // Create parameter container
   let paramsContainer = cachedElements.paramsContainer;
   if (!paramsContainer) {
@@ -1329,9 +1429,17 @@ export const renderFunctionCall = (block: HTMLPreElement, isProcessingRef: { cur
 
   // Process parameters
   Object.entries(partialParameters).forEach(([paramName, extractedValue]) => {
-    const isParamStreaming =
-      !rawContent.includes(`</parameter>`) ||
-      rawContent.indexOf('</parameter>', rawContent.indexOf(`<parameter name="${paramName}"`)) === -1;
+    let isParamStreaming: boolean;
+
+    if (isJSONFormat) {
+      // For JSON: parameter is streaming if function_call_end hasn't arrived
+      isParamStreaming = !functionInfo.isComplete;
+    } else {
+      // For XML: check if parameter closing tag exists
+      isParamStreaming =
+        !rawContent.includes(`</parameter>`) ||
+        rawContent.indexOf('</parameter>', rawContent.indexOf(`<parameter name="${paramName}"`)) === -1;
+    }
 
     const paramId = `${blockId}-${paramName}`;
     PerformanceUtils.batchStreamingUpdate(paramId, () => {
@@ -1342,8 +1450,12 @@ export const renderFunctionCall = (block: HTMLPreElement, isProcessingRef: { cur
   // Handle completion and auto-execution
   let completeParameters: Record<string, any> | null = null;
   if (functionInfo.isComplete) {
-    completeParameters = extractFunctionParameters(rawContent);
-    
+    if (isJSONFormat) {
+      completeParameters = extractJSONParameters(rawContent);
+    } else {
+      completeParameters = extractFunctionParameters(rawContent);
+    }
+
     // Auto-collapse if the block was auto-expanded and is now complete
     if (blockDiv.classList.contains('auto-expanded')) {
       AutoExpandUtils.scheduleAutoCollapse(blockDiv, 1500);
@@ -1361,7 +1473,7 @@ export const renderFunctionCall = (block: HTMLPreElement, isProcessingRef: { cur
       block.parentNode.insertBefore(blockDiv, block);
       block.style.display = 'none';
     } else {
-      if (CONFIG.debug) console.warn('Function call block has no parent element, cannot insert rendered block');
+      if (CONFIG.debug) logger.warn('Function call block has no parent element, cannot insert rendered block');
       return false;
     }
   }
@@ -1385,7 +1497,11 @@ export const renderFunctionCall = (block: HTMLPreElement, isProcessingRef: { cur
 
     if (!blockDiv.querySelector('.execute-button')) {
       if (!completeParameters) {
-        completeParameters = extractFunctionParameters(rawContent);
+        if (isJSONFormat) {
+          completeParameters = extractJSONParameters(rawContent);
+        } else {
+          completeParameters = extractFunctionParameters(rawContent);
+        }
       }
       addExecuteButton(buttonContainer!, rawContent);
 
@@ -1394,19 +1510,19 @@ export const renderFunctionCall = (block: HTMLPreElement, isProcessingRef: { cur
       const autoExecuteEnabled = automationState.autoExecute;
       if (contentSignature && !executionTracker.isFunctionExecuted(callId, contentSignature, functionName)) {
         if (autoExecuteEnabled !== true) {
-          console.debug(`Auto-execution disabled by user settings for block ${blockId} (${functionName})`);
+          logger.debug(`Auto-execution disabled by user settings for block ${blockId} (${functionName})`);
           return true;
         }
 
         if (executionTracker.isBlockExecuted(blockId) === true) {
-          console.debug(`Auto-execution skipped: Block ${blockId} (${functionName}) has already been processed`);
+          logger.debug(`Auto-execution skipped: Block ${blockId} (${functionName}) has already been processed`);
           return true;
         }
 
         executionTracker.markFunctionExecuted(callId, contentSignature, functionName);
         executionTracker.markBlockExecuted(blockId);
 
-        console.debug(`Setting up auto-execution for block ${blockId} (${functionName})`);
+        logger.debug(`Setting up auto-execution for block ${blockId} (${functionName})`);
 
         const functionDetails = {
           functionName,
