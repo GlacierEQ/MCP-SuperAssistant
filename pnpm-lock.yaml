@@ -50,7 +50,7 @@ importers:
         version: 19.0.4(@types/react@19.0.12)
       autoprefixer:
         specifier: ^10.4.20
-        version: 10.4.21(postcss@8.5.3)
+        version: 10.4.21(postcss@8.5.10)
       cross-env:
         specifier: ^7.0.3
         version: 7.0.3
@@ -106,11 +106,11 @@ importers:
         specifier: ^15.2.7
         version: 15.5.0
       postcss:
-        specifier: ^8.5.2
-        version: 8.5.3
+        specifier: ^8.5.10
+        version: 8.5.10
       postcss-load-config:
         specifier: ^6.0.1
-        version: 6.0.1(jiti@1.21.7)(postcss@8.5.3)(tsx@4.19.3)(yaml@2.7.0)
+        version: 6.0.1(jiti@1.21.7)(postcss@8.5.10)(tsx@4.19.3)(yaml@2.7.0)
       prettier:
         specifier: ^3.3.3
         version: 3.5.3
@@ -189,7 +189,7 @@ importers:
         version: 0.30.17
       ts-loader:
         specifier: ^9.5.1
-        version: 9.5.2(typescript@5.8.1-rc)(webpack@5.98.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.3))
+        version: 9.5.2(typescript@5.8.1-rc)(webpack@5.98.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.10))
 
   packages/dev-utils:
     devDependencies:
@@ -405,10 +405,10 @@ importers:
         version: 0.12.3
       autoprefixer:
         specifier: ^10.4.20
-        version: 10.4.21(postcss@8.5.3)
+        version: 10.4.21(postcss@8.5.10)
       postcss:
-        specifier: ^8.5.2
-        version: 8.5.3
+        specifier: ^8.5.10
+        version: 8.5.10
       tailwindcss:
         specifier: ^3.4.17
         version: 3.4.17(ts-node@10.9.2(@swc/core@1.11.13)(@types/node@22.19.19)(typescript@5.8.1-rc))
@@ -2498,8 +2498,8 @@ packages:
   electron-to-chromium@1.5.128:
     resolution: {integrity: sha512-bo1A4HH/NS522Ws0QNFIzyPcyUUNV/yyy70Ho1xqfGYzPUme2F/xr4tlEOuM6/A538U1vDA7a4XfCd1CKRegKQ==}
 
-  electron-to-chromium@1.5.354:
-    resolution: {integrity: sha512-JaBHwWcfIdmSAfWM5l3uwjGd431j8YEMikZ+K/2nXVuBqJKyZ0f+2h4n4JY5AyNiZmnY9qQr2RU3v9DxDmHMNg==}
+  electron-to-chromium@1.5.355:
+    resolution: {integrity: sha512-LUPZhKzZPYSPme1jEYohpkA+ybYCJztr1quAdBd7E7h3+VOBVcKkwwtBJu41nrjawrRzfb8mtMfzWozoaK0ZIQ==}
 
   elliptic@6.6.1:
     resolution: {integrity: sha512-RaddvvMatK2LJHqFJ+YA4WysVN5Ita9E35botqIYspQ4TkRAlCicdzKOjlyv/1Za5RyTNn7di//eEV0uTAfe3g==}
@@ -3507,8 +3507,8 @@ packages:
   mz@2.7.0:
     resolution: {integrity: sha512-z81GNO7nnYMEhrGh9LeymoE4+Yr0Wn5McHIZMK5cfQCl+NDX08sCZgUc9/6MHni9IWuFLm1Z3HTCXu2z9fN62Q==}
 
-  nanoid@3.3.11:
-    resolution: {integrity: sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w==}
+  nanoid@3.3.12:
+    resolution: {integrity: sha512-ZB9RH/39qpq5Vu6Y+NmUaFhQR6pp+M2Xt76XBnEwDaGcVAqhlvxrl3B2bKS5D3NH3QR76v3aSrKaF/Kiy7lEtQ==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
@@ -3805,8 +3805,8 @@ packages:
   postcss-value-parser@4.2.0:
     resolution: {integrity: sha512-1NNCs6uurfkVbeXG4S8JFT9t19m45ICnif8zWLd5oPSZ50QnwMfK+H3jv408d4jw/7Bttv5axS5IiHoLaVNHeQ==}
 
-  postcss@8.5.3:
-    resolution: {integrity: sha512-dle9A3yYxlBSrt8Fu+IpjGT8SY8hN0mlaA6GY8t0P5PjIOZemULz/E2Bnm/2dcUOena75OTNkHI76uZBNUUq3A==}
+  postcss@8.5.10:
+    resolution: {integrity: sha512-pMMHxBOZKFU6HgAZ4eyGnwXF/EvPGGqUr0MnZ5+99485wwW41kW91A4LOGxSHhgugZmSChL5AlElNdwlNgcnLQ==}
     engines: {node: ^10 || ^12 || >=14}
 
   prelude-ls@1.2.1:
@@ -6362,14 +6362,14 @@ snapshots:
 
   async-function@1.0.0: {}
 
-  autoprefixer@10.4.21(postcss@8.5.3):
+  autoprefixer@10.4.21(postcss@8.5.10):
     dependencies:
       browserslist: 4.24.4
       caniuse-lite: 1.0.30001707
       fraction.js: 4.3.7
       normalize-range: 0.1.2
       picocolors: 1.1.1
-      postcss: 8.5.3
+      postcss: 8.5.10
       postcss-value-parser: 4.2.0
 
   available-typed-arrays@1.0.7:
@@ -6496,7 +6496,7 @@ snapshots:
     dependencies:
       baseline-browser-mapping: 2.10.29
       caniuse-lite: 1.0.30001792
-      electron-to-chromium: 1.5.354
+      electron-to-chromium: 1.5.355
       node-releases: 2.0.44
       update-browserslist-db: 1.2.3(browserslist@4.28.2)
 
@@ -6794,7 +6794,7 @@ snapshots:
 
   electron-to-chromium@1.5.128: {}
 
-  electron-to-chromium@1.5.354: {}
+  electron-to-chromium@1.5.355: {}
 
   elliptic@6.6.1:
     dependencies:
@@ -7206,7 +7206,7 @@ snapshots:
   eslint-plugin-tailwindcss@3.18.0(tailwindcss@3.4.17(ts-node@10.9.2(@swc/core@1.11.13)(@types/node@22.13.14)(typescript@5.8.1-rc))):
     dependencies:
       fast-glob: 3.3.3
-      postcss: 8.5.3
+      postcss: 8.5.10
       tailwindcss: 3.4.17(ts-node@10.9.2(@swc/core@1.11.13)(@types/node@22.13.14)(typescript@5.8.1-rc))
 
   eslint-scope@5.1.1:
@@ -8084,7 +8084,7 @@ snapshots:
       object-assign: 4.1.1
       thenify-all: 1.6.0
 
-  nanoid@3.3.11: {}
+  nanoid@3.3.12: {}
 
   napi-postinstall@0.2.3: {}
 
@@ -8326,46 +8326,46 @@ snapshots:
 
   possible-typed-array-names@1.1.0: {}
 
-  postcss-import@15.1.0(postcss@8.5.3):
+  postcss-import@15.1.0(postcss@8.5.10):
     dependencies:
-      postcss: 8.5.3
+      postcss: 8.5.10
       postcss-value-parser: 4.2.0
       read-cache: 1.0.0
       resolve: 1.22.10
 
-  postcss-js@4.0.1(postcss@8.5.3):
+  postcss-js@4.0.1(postcss@8.5.10):
     dependencies:
       camelcase-css: 2.0.1
-      postcss: 8.5.3
+      postcss: 8.5.10
 
-  postcss-load-config@4.0.2(postcss@8.5.3)(ts-node@10.9.2(@swc/core@1.11.13)(@types/node@22.13.14)(typescript@5.8.1-rc)):
+  postcss-load-config@4.0.2(postcss@8.5.10)(ts-node@10.9.2(@swc/core@1.11.13)(@types/node@22.13.14)(typescript@5.8.1-rc)):
     dependencies:
       lilconfig: 3.1.3
       yaml: 2.7.0
     optionalDependencies:
-      postcss: 8.5.3
+      postcss: 8.5.10
       ts-node: 10.9.2(@swc/core@1.11.13)(@types/node@22.13.14)(typescript@5.8.1-rc)
 
-  postcss-load-config@4.0.2(postcss@8.5.3)(ts-node@10.9.2(@swc/core@1.11.13)(@types/node@22.19.19)(typescript@5.8.1-rc)):
+  postcss-load-config@4.0.2(postcss@8.5.10)(ts-node@10.9.2(@swc/core@1.11.13)(@types/node@22.19.19)(typescript@5.8.1-rc)):
     dependencies:
       lilconfig: 3.1.3
       yaml: 2.7.0
     optionalDependencies:
-      postcss: 8.5.3
+      postcss: 8.5.10
       ts-node: 10.9.2(@swc/core@1.11.13)(@types/node@22.19.19)(typescript@5.8.1-rc)
 
-  postcss-load-config@6.0.1(jiti@1.21.7)(postcss@8.5.3)(tsx@4.19.3)(yaml@2.7.0):
+  postcss-load-config@6.0.1(jiti@1.21.7)(postcss@8.5.10)(tsx@4.19.3)(yaml@2.7.0):
     dependencies:
       lilconfig: 3.1.3
     optionalDependencies:
       jiti: 1.21.7
-      postcss: 8.5.3
+      postcss: 8.5.10
       tsx: 4.19.3
       yaml: 2.7.0
 
-  postcss-nested@6.2.0(postcss@8.5.3):
+  postcss-nested@6.2.0(postcss@8.5.10):
     dependencies:
-      postcss: 8.5.3
+      postcss: 8.5.10
       postcss-selector-parser: 6.1.2
 
   postcss-selector-parser@6.1.2:
@@ -8375,9 +8375,9 @@ snapshots:
 
   postcss-value-parser@4.2.0: {}
 
-  postcss@8.5.3:
+  postcss@8.5.10:
     dependencies:
-      nanoid: 3.3.11
+      nanoid: 3.3.12
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
@@ -8976,11 +8976,11 @@ snapshots:
       normalize-path: 3.0.0
       object-hash: 3.0.0
       picocolors: 1.1.1
-      postcss: 8.5.3
-      postcss-import: 15.1.0(postcss@8.5.3)
-      postcss-js: 4.0.1(postcss@8.5.3)
-      postcss-load-config: 4.0.2(postcss@8.5.3)(ts-node@10.9.2(@swc/core@1.11.13)(@types/node@22.13.14)(typescript@5.8.1-rc))
-      postcss-nested: 6.2.0(postcss@8.5.3)
+      postcss: 8.5.10
+      postcss-import: 15.1.0(postcss@8.5.10)
+      postcss-js: 4.0.1(postcss@8.5.10)
+      postcss-load-config: 4.0.2(postcss@8.5.10)(ts-node@10.9.2(@swc/core@1.11.13)(@types/node@22.13.14)(typescript@5.8.1-rc))
+      postcss-nested: 6.2.0(postcss@8.5.10)
       postcss-selector-parser: 6.1.2
       resolve: 1.22.10
       sucrase: 3.35.0
@@ -9003,11 +9003,11 @@ snapshots:
       normalize-path: 3.0.0
       object-hash: 3.0.0
       picocolors: 1.1.1
-      postcss: 8.5.3
-      postcss-import: 15.1.0(postcss@8.5.3)
-      postcss-js: 4.0.1(postcss@8.5.3)
-      postcss-load-config: 4.0.2(postcss@8.5.3)(ts-node@10.9.2(@swc/core@1.11.13)(@types/node@22.19.19)(typescript@5.8.1-rc))
-      postcss-nested: 6.2.0(postcss@8.5.3)
+      postcss: 8.5.10
+      postcss-import: 15.1.0(postcss@8.5.10)
+      postcss-js: 4.0.1(postcss@8.5.10)
+      postcss-load-config: 4.0.2(postcss@8.5.10)(ts-node@10.9.2(@swc/core@1.11.13)(@types/node@22.19.19)(typescript@5.8.1-rc))
+      postcss-nested: 6.2.0(postcss@8.5.10)
       postcss-selector-parser: 6.1.2
       resolve: 1.22.10
       sucrase: 3.35.0
@@ -9018,17 +9018,17 @@ snapshots:
 
   tapable@2.3.3: {}
 
-  terser-webpack-plugin@5.6.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.3)(webpack@5.98.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.3)):
+  terser-webpack-plugin@5.6.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.10)(webpack@5.98.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.10)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
       schema-utils: 4.3.3
       terser: 5.47.1
-      webpack: 5.98.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.3)
+      webpack: 5.98.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.10)
     optionalDependencies:
       '@swc/core': 1.11.13
       esbuild: 0.25.2
-      postcss: 8.5.3
+      postcss: 8.5.10
 
   terser@5.47.1:
     dependencies:
@@ -9075,7 +9075,7 @@ snapshots:
 
   ts-interface-checker@0.1.13: {}
 
-  ts-loader@9.5.2(typescript@5.8.1-rc)(webpack@5.98.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.3)):
+  ts-loader@9.5.2(typescript@5.8.1-rc)(webpack@5.98.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.10)):
     dependencies:
       chalk: 4.1.2
       enhanced-resolve: 5.18.1
@@ -9083,7 +9083,7 @@ snapshots:
       semver: 7.7.1
       source-map: 0.7.4
       typescript: 5.8.1-rc
-      webpack: 5.98.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.3)
+      webpack: 5.98.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.10)
 
   ts-node@10.9.2(@swc/core@1.11.13)(@types/node@22.13.14)(typescript@5.8.1-rc):
     dependencies:
@@ -9335,7 +9335,7 @@ snapshots:
       esbuild: 0.25.2
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
-      postcss: 8.5.3
+      postcss: 8.5.10
       rollup: 4.60.3
       tinyglobby: 0.2.16
     optionalDependencies:
@@ -9351,7 +9351,7 @@ snapshots:
       esbuild: 0.25.2
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
-      postcss: 8.5.3
+      postcss: 8.5.10
       rollup: 4.60.3
       tinyglobby: 0.2.16
     optionalDependencies:
@@ -9375,7 +9375,7 @@ snapshots:
 
   webpack-sources@3.4.1: {}
 
-  webpack@5.98.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.3):
+  webpack@5.98.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.10):
     dependencies:
       '@types/eslint-scope': 3.7.7
       '@types/estree': 1.0.9
@@ -9397,7 +9397,7 @@ snapshots:
       neo-async: 2.6.2
       schema-utils: 4.3.3
       tapable: 2.3.3
-      terser-webpack-plugin: 5.6.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.3)(webpack@5.98.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.3))
+      terser-webpack-plugin: 5.6.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.10)(webpack@5.98.0(@swc/core@1.11.13)(esbuild@0.25.2)(postcss@8.5.10))
       watchpack: 2.5.1
       webpack-sources: 3.4.1
     transitivePeerDependencies:
